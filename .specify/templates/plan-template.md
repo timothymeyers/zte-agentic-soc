@@ -33,14 +33,15 @@
 
 Verify compliance with `.specify/memory/constitution.md`:
 
-- [ ] **AI-First Security Operations**: Does this feature use AI agents for security operations? Are the four core agent types (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) properly leveraged?
-- [ ] **Agent Collaboration & Orchestration**: Does the design include proper orchestration of agent interactions? Is context sharing implemented?
+- [ ] **MVP/POC Scope**: Is this demonstrable with simulated/mock data? Are plugin points defined for production integration?
+- [ ] **AI-First Security Operations**: Does this feature use AI agents for security operations? Are the four core agent types (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) properly leveraged? Can agents be composed of sub-agents, tools, or knowledge sources?
+- [ ] **Agent Collaboration & Orchestration**: Does the design use Microsoft Foundry or Microsoft Agent Framework for orchestration? Is agent-to-agent (A2A) communication implemented?
 - [ ] **Autonomous-but-Supervised Operations**: Are appropriate human approval gates defined for high-risk actions? Are audit logs in place?
 - [ ] **Proactive Threat Detection**: Does the feature enable proactive hunting or predictive intelligence (if applicable)?
-- [ ] **Continuous Context Sharing**: Is all security data properly integrated with Microsoft Sentinel? Are agents sharing context?
+- [ ] **Continuous Context Sharing**: Are agents sharing context via A2A communication or shared stores? Are plugin points defined for Sentinel integration?
 - [ ] **Explainability & Transparency**: Do agent actions include natural language explanations and rationale?
 - [ ] **Continuous Learning & Adaptation**: Are feedback loops and learning mechanisms included (if applicable)?
-- [ ] **Technology Stack**: Are Azure AI Foundry, Security Copilot, Sentinel, and Defender XDR properly utilized?
+- [ ] **Technology Stack**: Are Microsoft Foundry (AI Foundry Client), Microsoft Agent Framework properly utilized? Is Microsoft Fabric considered for data storage? Are Logic Apps avoided?
 - [ ] **Security & Compliance**: Are data protection, access control, and incident handling requirements met?
 
 *Note: Not all principles apply to every feature. Document which principles are relevant and how they are satisfied.*

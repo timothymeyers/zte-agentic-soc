@@ -1,10 +1,12 @@
 # zte-agentic-soc
 
-Implementation of an Agentic Security Operations Center MVP using AI-powered agents for modern threat detection and response.
+**MVP Proof of Concept** for an Agentic Security Operations Center using AI-powered agents for modern threat detection and response.
 
 ## Overview
 
-This project implements an **AI-enhanced Security Operations Center (SOC)** architecture based on the **Agentic SOC Layer** design. It leverages specialized AI agents built with Azure AI Foundry and Microsoft Security Copilot to augment human security analysts, enabling faster threat detection, automated triage, proactive hunting, and coordinated incident response.
+This project implements an **AI-enhanced Security Operations Center (SOC)** architecture as a **proof of concept demonstration** based on the **Agentic SOC Layer** design. It leverages specialized AI agents built with Microsoft Foundry (AI Foundry) and Microsoft Agent Framework to augment human security analysts, enabling faster threat detection, automated triage, proactive hunting, and coordinated incident response.
+
+**MVP Approach**: This implementation is designed to be demonstrable with simulated or mock data without requiring full production infrastructure deployment. All components include clear "plugin" points for production integration in future phases.
 
 ### Core Agents
 
@@ -15,7 +17,7 @@ The Agentic SOC implements four specialized AI agents working collaboratively:
 3. **Incident Response Agent** - Automates containment, eradication, and recovery actions through orchestrated playbooks
 4. **Threat Intelligence Agent** - Aggregates and distills threat intelligence to provide context and daily briefings
 
-These agents are coordinated by an **Orchestration Layer** that manages workflows, context sharing, and human escalation.
+These top-level agents may be composed of sub-agents, tools, or knowledge sources as implementation details. They are coordinated by an **Orchestration Layer** built with Microsoft Foundry or Microsoft Agent Framework that manages agent-to-agent communication, workflows, context sharing, and human escalation.
 
 ## Constitutional Principles
 
@@ -32,11 +34,18 @@ This project is governed by a comprehensive constitution that establishes seven 
 
 ## Technology Stack
 
-- **AI Platform**: Azure AI Foundry, Azure OpenAI (via Security Copilot)
-- **SIEM/XDR**: Microsoft Sentinel, Microsoft Defender XDR
-- **Orchestration**: Azure Logic Apps, Azure Functions, Azure AI Foundry Agent Service
-- **Identity**: Microsoft Entra ID (Azure AD)
-- **Data**: Azure Monitor, Log Analytics, Cosmos DB
+**MVP/POC Phase**:
+- **AI Platform**: Microsoft Foundry (AI Foundry) with AI Foundry Client interface
+- **Orchestration**: Microsoft Foundry or Microsoft Agent Framework for agent-to-agent communication
+- **Data Storage**: Microsoft Fabric (preferred) or mock data sources with clear plugin points
+- **SIEM/XDR**: Simulated data or optional Microsoft Sentinel/Defender XDR integration
+- **Identity**: Optional Microsoft Entra ID integration with clear plugin points
+
+**Production Integration Points**:
+- Microsoft Sentinel and Microsoft Defender XDR for security telemetry
+- Microsoft Entra ID (Azure AD) for user and entity context
+- Microsoft Fabric for scalable data storage
+- Azure Monitor and Log Analytics for operational telemetry
 
 ## Project Structure
 
@@ -56,11 +65,13 @@ This project is governed by a comprehensive constitution that establishes seven 
 ## Development Approach
 
 All development follows the constitutional framework with emphasis on:
+- **MVP/POC demonstration** with simulated or mock data
+- Clear **plugin points** for production integration
 - Incremental agent implementation with testing at each stage
+- Agent flexibility: may start monolithic, evolve to sub-agents/tools/knowledge sources
 - Human-in-the-loop for high-risk automated actions
 - Explainable AI decisions with clear rationale
-- Integration with Microsoft security ecosystem
-- Continuous learning from analyst feedback
+- Agent-to-agent communication via Microsoft Foundry or Microsoft Agent Framework
 
 ## Getting Started
 

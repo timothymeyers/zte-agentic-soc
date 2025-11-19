@@ -1,26 +1,33 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version Change: Initial → 1.0.0
-Modified Principles: N/A (initial creation)
-Added Sections: All sections (initial constitution)
-Removed Sections: None
+Version Change: 1.0.0 → 1.1.0
+Modified Principles: Technology Stack updated for MVP/POC approach
+Added Sections: MVP/POC Approach guidance
+Removed Sections: Removed Logic Apps references
 
 Templates Status:
 ✅ .specify/templates/plan-template.md - Constitution Check section references this file
 ✅ .specify/templates/spec-template.md - Requirements alignment verified
 ✅ .specify/templates/tasks-template.md - Task categorization aligns with principles
-✅ README.md - Minimal, will be expanded as project develops
+✅ README.md - Updated to reflect MVP/POC focus
 
-Follow-up TODOs: None - all placeholders filled
+Follow-up TODOs:
+- Research Security Copilot integration approach
+- Evaluate Microsoft Fabric for telemetry storage
 
-Rationale for Version 1.0.0:
-This is the MAJOR initial release establishing the constitutional framework for the
-Agentic Security Operations Center. It defines the fundamental principles that will
-govern all development, agent design, and operational decisions.
+Rationale for Version 1.1.0 (MINOR):
+Updated technology stack to reflect MVP proof of concept approach with simulated/mock data,
+replaced Logic Apps with Microsoft Foundry/Agent Framework, and clarified agent architecture
+flexibility (sub-agents, tools, knowledge sources). Changed Azure OpenAI references to AI
+Foundry Client interface. Added Microsoft Fabric as preferred data storage option.
 -->
 
 # Agentic SOC Constitution
+
+## Project Scope
+
+This constitution governs the development of an **MVP proof of concept** for an Agentic Security Operations Center. The implementation MUST be demonstrable with simulated or mock data and MUST NOT require full production infrastructure deployment. All components MUST have clear "plugin" points to enable production integration in future phases.
 
 ## Core Principles
 
@@ -32,8 +39,9 @@ The Agentic SOC MUST leverage artificial intelligence as the primary mechanism f
 
 **Requirements**:
 - AI agents MUST be implemented for the four core functions: Alert Triage, Threat Hunting, Incident Response, and Threat Intelligence
+- These are top-level agents that MAY be composed of sub-agents, tools, or knowledge sources as implementation details
 - Each agent MUST have clearly defined responsibilities and capabilities
-- Agent implementations MUST use Azure AI Foundry and Security Copilot as the primary platforms
+- Agent implementations MUST use Microsoft Foundry (AI Foundry) as the primary platform
 - Agents MUST provide explainable outputs with clear rationale for their decisions and actions
 
 ### II. Agent Collaboration & Orchestration
@@ -43,8 +51,9 @@ Agents MUST NOT operate in isolation. An orchestration layer MUST coordinate age
 **Rationale**: Complex security scenarios require multiple types of expertise. Just as human SOC teams specialize (tier 1 analysts, threat hunters, incident responders, threat intelligence analysts), AI agents benefit from specialization. Orchestration ensures the right agent handles the right task at the right time, with full context.
 
 **Requirements**:
-- An orchestration layer MUST be implemented using Azure Logic Apps, Azure Functions, or Azure AI Foundry Agent Service
-- Context MUST be passed between agents via structured interfaces (Sentinel incidents, shared knowledge stores, or agent-to-agent communication)
+- An orchestration layer MUST be implemented using Microsoft Foundry (AI Foundry) or Microsoft Agent Framework
+- Agent-to-agent (A2A) communication MUST be managed by Microsoft Foundry or orchestrated by Microsoft Agent Framework in code
+- Context MUST be passed between agents via structured interfaces (agent-to-agent communication, shared knowledge stores, or Sentinel incidents)
 - Workflows MUST support both event-driven and schedule-driven agent invocation
 - The orchestrator MUST implement escalation paths for scenarios requiring human intervention
 - Agent collaboration MUST follow the pattern: Triage Agent (scout) → Threat Intel Agent (advisor) → Threat Hunting Agent (detective) → Incident Response Agent (firefighter)
@@ -103,7 +112,7 @@ All AI agent decisions and actions MUST be explainable, with clear rationale pro
 - Threat hunting findings MUST explain what pattern or anomaly triggered detection
 - Incident response recommendations MUST cite the threat intelligence or past incidents that inform them
 - All explanations MUST be stored with incidents for audit and review
-- Security Copilot's natural language generation MUST be leveraged for human-readable summaries
+- Microsoft Foundry's natural language generation capabilities MUST be leveraged for human-readable summaries
 
 ### VII. Continuous Learning & Adaptation
 
@@ -129,18 +138,19 @@ The Agentic SOC MUST implement four specialized agents as the minimum viable arc
 
 **Threat Hunting Agent**: Proactively searches for threats using natural language queries, automated analytics, and anomaly detection. MUST support both interactive (analyst-driven) and automated (scheduled) hunting modes.
 
-**Incident Response Agent**: Automates containment, eradication, and recovery actions. MUST execute playbooks via Sentinel Logic Apps and API integrations with Defender, Entra ID, and Azure services.
+**Incident Response Agent**: Automates containment, eradication, and recovery actions. MUST execute playbooks via Microsoft Agent Framework and API integrations with Defender, Entra ID, and Azure services.
 
 **Threat Intelligence Agent**: Aggregates and distills threat intelligence from Microsoft Threat Intelligence, external feeds, and internal sources. MUST provide daily briefings and on-demand enrichment for alerts and incidents.
 
 ### Technology Stack
 
-- **AI Platform**: Azure AI Foundry and Azure OpenAI via Security Copilot MUST be the primary AI infrastructure
-- **SIEM/XDR**: Microsoft Sentinel and Microsoft Defender XDR MUST be the core security platforms
-- **Orchestration**: Azure Logic Apps, Azure Functions, or Azure AI Foundry Agent Service MUST coordinate workflows
-- **Data Storage**: Azure Monitor / Log Analytics workspaces MUST store security telemetry; Cosmos DB or Sentinel incident fields MUST store shared agent context
-- **Identity & Access**: Microsoft Entra ID (Azure AD) MUST be integrated for user and entity context
-- **Development**: All agent logic MUST be version-controlled; Infrastructure-as-Code principles MUST apply to orchestration workflows
+- **AI Platform**: Microsoft Foundry (AI Foundry) with AI Foundry Client interface MUST be the primary AI infrastructure
+- **SIEM/XDR**: Microsoft Sentinel and Microsoft Defender XDR SHOULD be the core security platforms for production scenarios
+- **Orchestration**: Microsoft Foundry or Microsoft Agent Framework MUST coordinate workflows and agent-to-agent communication
+- **Data Storage**: Microsoft Fabric SHOULD be leveraged for scalable security telemetry storage; Azure Monitor / Log Analytics workspaces MAY be used; Shared agent context MUST use appropriate storage (Fabric, Cosmos DB, or Sentinel incident fields)
+- **Identity & Access**: Microsoft Entra ID (Azure AD) SHOULD be integrated for user and entity context in production scenarios
+- **Development**: All agent logic MUST be version-controlled; Infrastructure-as-Code principles SHOULD apply to orchestration workflows
+- **MVP/POC Approach**: For proof of concept demonstrations, simulated or mock data MAY be used; Clear "plugin" points MUST be defined for production integration
 
 ### Integration Requirements
 
@@ -176,18 +186,30 @@ The Agentic SOC MUST implement four specialized agents as the minimum viable arc
 
 ### Implementation Approach
 
+**MVP/POC Phase**:
 - Start with the minimum viable agent set (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence)
+- Implement agents using Microsoft Foundry or Microsoft Agent Framework for orchestration
+- Each agent MUST be demonstrable with simulated or mock data
+- All integration points MUST be clearly defined as "plugin" points for production scenarios
+- Agents MAY be implemented as monolithic components initially, with clear paths to decompose into sub-agents, tools, or knowledge sources
+
+**Production Evolution**:
 - Implement agents incrementally: first manual playbooks, then semi-automated with approval gates, finally autonomous within policy boundaries
 - Each agent MUST be testable independently before integration into orchestrated workflows
-- Use pilot/preview features from Security Copilot and Azure AI Foundry as they align with principles
-- Validate each agent capability with SOC analysts before production deployment
+- Validate each agent capability with security stakeholders before production deployment
 
 ### Testing & Validation
 
+**MVP/POC Phase**:
+- Agent behaviors MUST be demonstrable with simulated incident scenarios and mock data
+- Each agent MUST prove core capabilities in isolation and in orchestrated workflows
+- Clear documentation MUST show how production data would replace mock data
+
+**Production Phase**:
 - Agent behaviors MUST be tested with historical incident data before live deployment
-- Red team exercises MUST validate agent detection and response capabilities
-- False positive/negative rates MUST be measured and tracked over time
-- Performance metrics MUST include: time to triage, mean time to detect (MTTD), mean time to respond (MTTR), analyst time saved
+- Red team exercises SHOULD validate agent detection and response capabilities
+- False positive/negative rates SHOULD be measured and tracked over time
+- Performance metrics SHOULD include: time to triage, mean time to detect (MTTD), mean time to respond (MTTR), analyst time saved
 - Periodic reviews MUST assess whether agents are operating within constitutional principles
 
 ### Documentation
@@ -225,7 +247,8 @@ This Constitution supersedes all other development practices, playbooks, and gui
 
 ### Version History
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
+**Version**: 1.1.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
 
 **Changelog**:
+- 1.1.0 (2025-11-19): Updated for MVP/POC approach with simulated data support; replaced Azure Logic Apps with Microsoft Foundry/Agent Framework; changed Azure OpenAI to AI Foundry Client; added Microsoft Fabric for data storage; clarified agent architecture flexibility (sub-agents, tools, knowledge sources); added clear plugin points for production integration
 - 1.0.0 (2025-11-19): Initial constitution ratified, establishing seven core principles and governance framework for Agentic SOC
