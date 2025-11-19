@@ -31,7 +31,19 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with `.specify/memory/constitution.md`:
+
+- [ ] **AI-First Security Operations**: Does this feature use AI agents for security operations? Are the four core agent types (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) properly leveraged?
+- [ ] **Agent Collaboration & Orchestration**: Does the design include proper orchestration of agent interactions? Is context sharing implemented?
+- [ ] **Autonomous-but-Supervised Operations**: Are appropriate human approval gates defined for high-risk actions? Are audit logs in place?
+- [ ] **Proactive Threat Detection**: Does the feature enable proactive hunting or predictive intelligence (if applicable)?
+- [ ] **Continuous Context Sharing**: Is all security data properly integrated with Microsoft Sentinel? Are agents sharing context?
+- [ ] **Explainability & Transparency**: Do agent actions include natural language explanations and rationale?
+- [ ] **Continuous Learning & Adaptation**: Are feedback loops and learning mechanisms included (if applicable)?
+- [ ] **Technology Stack**: Are Azure AI Foundry, Security Copilot, Sentinel, and Defender XDR properly utilized?
+- [ ] **Security & Compliance**: Are data protection, access control, and incident handling requirements met?
+
+*Note: Not all principles apply to every feature. Document which principles are relevant and how they are satisfied.*
 
 ## Project Structure
 
