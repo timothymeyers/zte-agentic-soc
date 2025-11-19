@@ -47,6 +47,13 @@ This project is governed by a comprehensive constitution that establishes seven 
 - Microsoft Fabric for scalable data storage
 - Azure Monitor and Log Analytics for operational telemetry
 
+**Production Deployment**:
+In a production scenario, the Agentic SOC will be deployed following Azure best practices:
+- **Azure Landing Zone** architecture for enterprise-grade deployment
+- **Azure Verified Modules** (AVM) for consistent, compliant infrastructure
+- **Microsoft Cloud Adoption Framework** (CAF) alignment
+- **Well-Architected Framework** compliance (Reliability, Security, Cost Optimization, Operational Excellence, Performance Efficiency)
+
 ## Project Structure
 
 ```

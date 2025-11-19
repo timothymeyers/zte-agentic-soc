@@ -42,6 +42,7 @@ Verify compliance with `.specify/memory/constitution.md`:
 - [ ] **Explainability & Transparency**: Do agent actions include natural language explanations and rationale?
 - [ ] **Continuous Learning & Adaptation**: Are feedback loops and learning mechanisms included (if applicable)?
 - [ ] **Technology Stack**: Are Microsoft Foundry (AI Foundry Client), Microsoft Agent Framework properly utilized? Is Microsoft Fabric considered for data storage? Are Logic Apps avoided?
+- [ ] **Production Deployment** (for production features): Does the design align with Azure Landing Zone architecture? Are Azure Verified Modules considered? Does it follow Microsoft Cloud Adoption Framework and Well-Architected Framework principles?
 - [ ] **Security & Compliance**: Are data protection, access control, and incident handling requirements met?
 
 *Note: Not all principles apply to every feature. Document which principles are relevant and how they are satisfied.*

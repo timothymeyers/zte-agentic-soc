@@ -1,9 +1,9 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version Change: 1.0.0 → 1.1.0
-Modified Principles: Technology Stack updated for MVP/POC approach
-Added Sections: MVP/POC Approach guidance
+Version Change: 1.0.0 → 1.1.0 → 1.2.0
+Modified Principles: Technology Stack updated for MVP/POC approach; Added Production Deployment section
+Added Sections: MVP/POC Approach guidance; Production Deployment with Azure Landing Zone, CAF, and WAF requirements
 Removed Sections: Removed Logic Apps references
 
 Templates Status:
@@ -16,11 +16,10 @@ Follow-up TODOs:
 - Research Security Copilot integration approach
 - Evaluate Microsoft Fabric for telemetry storage
 
-Rationale for Version 1.1.0 (MINOR):
-Updated technology stack to reflect MVP proof of concept approach with simulated/mock data,
-replaced Logic Apps with Microsoft Foundry/Agent Framework, and clarified agent architecture
-flexibility (sub-agents, tools, knowledge sources). Changed Azure OpenAI references to AI
-Foundry Client interface. Added Microsoft Fabric as preferred data storage option.
+Rationale for Version 1.2.0 (MINOR):
+Added Production Deployment section specifying Azure Landing Zone deployment with Azure Verified 
+Modules, Microsoft Cloud Adoption Framework alignment, and Well-Architected Framework compliance.
+This establishes clear production governance requirements while maintaining MVP/POC flexibility.
 -->
 
 # Agentic SOC Constitution
@@ -152,6 +151,20 @@ The Agentic SOC MUST implement four specialized agents as the minimum viable arc
 - **Development**: All agent logic MUST be version-controlled; Infrastructure-as-Code principles SHOULD apply to orchestration workflows
 - **MVP/POC Approach**: For proof of concept demonstrations, simulated or mock data MAY be used; Clear "plugin" points MUST be defined for production integration
 
+### Production Deployment
+
+In a production scenario, the Agentic SOC infrastructure MUST follow Azure best practices and governance frameworks:
+
+- **Azure Landing Zone**: Production deployments MUST be deployed into an Azure Landing Zone architecture
+- **Azure Verified Modules**: Infrastructure SHOULD leverage Azure Verified Modules (AVM) for consistent, compliant resource deployment
+- **Microsoft Cloud Adoption Framework**: All production deployments MUST align with the Microsoft Cloud Adoption Framework (CAF) principles and best practices
+- **Well-Architected Framework**: Architecture and implementation MUST follow the Microsoft Azure Well-Architected Framework pillars:
+  - **Reliability**: High availability, disaster recovery, and resilience
+  - **Security**: Defense in depth, identity management, and data protection
+  - **Cost Optimization**: Resource efficiency and cost management
+  - **Operational Excellence**: Monitoring, automation, and DevOps practices
+  - **Performance Efficiency**: Scalability and responsiveness
+
 ### Integration Requirements
 
 - All agents MUST expose APIs or be callable via the orchestration layer
@@ -247,8 +260,9 @@ This Constitution supersedes all other development practices, playbooks, and gui
 
 ### Version History
 
-**Version**: 1.1.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
+**Version**: 1.2.0 | **Ratified**: 2025-11-19 | **Last Amended**: 2025-11-19
 
 **Changelog**:
+- 1.2.0 (2025-11-19): Added Production Deployment section specifying Azure Landing Zone deployment with Azure Verified Modules, Microsoft Cloud Adoption Framework alignment, and Well-Architected Framework compliance requirements
 - 1.1.0 (2025-11-19): Updated for MVP/POC approach with simulated data support; replaced Azure Logic Apps with Microsoft Foundry/Agent Framework; changed Azure OpenAI to AI Foundry Client; added Microsoft Fabric for data storage; clarified agent architecture flexibility (sub-agents, tools, knowledge sources); added clear plugin points for production integration
 - 1.0.0 (2025-11-19): Initial constitution ratified, establishing seven core principles and governance framework for Agentic SOC
