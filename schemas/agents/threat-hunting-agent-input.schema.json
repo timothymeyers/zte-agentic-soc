@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/threat-hunting-agent-input.schema.json",
+  "title": "ThreatHuntingInput",
+  "description": "Input schema for Threat Hunting Agent. Accepts natural language queries or structured hunt parameters for proactive threat discovery.",
+  "type": "object",
+  "required": ["huntId", "query", "mode"],
+  "properties": {
+    "huntId": {
+      "type": "string",
+      "description": "Unique identifier for this hunt operation",
+      "pattern": "^HUNT-[0-9]{4}-[0-9]+$",
+      "examples": ["HUNT-2025-001234"]
+    },
+    "query": {
+      "type": "string",
+      "description": "Natural language query describing what to hunt for",
+      "minLength": 10,
+      "maxLength": 1024,
+      "examples": [
+        "Show all machines that communicated with suspicious IP addresses in the last 24 hours",
+        "Find users with unusual login patterns from high-risk countries",
+        "Detect lateral movement attempts using administrative accounts"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["interactive", "automated", "scheduled"],
+      "description": "Hunt execution mode: interactive (analyst-driven), automated (triggered by event), or scheduled (recurring)"
+    },
+    "timeRange": {
+      "type": "object",
+      "description": "Time range for the hunt query",
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start time in ISO 8601 format"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End time in ISO 8601 format"
+        },
+        "relativeTime": {
+          "type": "string",
+          "description": "Relative time range (e.g., 'last 24 hours', 'last 7 days')",
+          "examples": ["last 24 hours", "last 7 days", "last 30 days"]
+        }
+      }
+    },
+    "dataSources": {
+      "type": "array",
+      "description": "Specific data sources to query (if not specified, searches all available)",
+      "items": {
+        "type": "string",
+        "enum": ["Sentinel", "DefenderEndpoint", "DefenderIdentity", "Fabric", "SignInLogs", "AuditLogs", "NetworkLogs"]
+      }
+    },
+    "pivotContext": {
+      "type": "object",
+      "description": "Optional context from related investigation to pivot from",
+      "properties": {
+        "incidentId": {
+          "type": "string",
+          "description": "Related incident ID"
+        },
+        "alertId": {
+          "type": "string",
+          "description": "Related alert ID"
+        },
+        "entities": {
+          "type": "array",
+          "description": "Entities to pivot from (IP, user, host, etc.)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string"},
+              "value": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "string",
+      "description": "Optional hypothesis being tested by this hunt",
+      "maxLength": 512
+    },
+    "requestedBy": {
+      "type": "string",
+      "description": "User or agent that requested this hunt",
+      "examples": ["analyst@contoso.com", "IncidentResponseAgent"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hunt request timestamp"
+    }
+  }
+}

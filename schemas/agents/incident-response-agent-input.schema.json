@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/incident-response-agent-input.schema.json",
+  "title": "IncidentResponseInput",
+  "description": "Input schema for Incident Response Agent. Accepts incident details and selected playbook for automated containment and response actions.",
+  "type": "object",
+  "required": ["incidentId", "incidentType", "severity", "entities"],
+  "properties": {
+    "incidentId": {
+      "type": "string",
+      "description": "Unique incident identifier",
+      "pattern": "^INC-[0-9]{4}-[0-9]+$",
+      "examples": ["INC-2025-001234"]
+    },
+    "incidentType": {
+      "type": "string",
+      "enum": [
+        "malware",
+        "phishing",
+        "data_exfiltration",
+        "lateral_movement",
+        "credential_compromise",
+        "privilege_escalation",
+        "ransomware",
+        "insider_threat",
+        "ddos",
+        "unauthorized_access",
+        "other"
+      ],
+      "description": "Type of security incident requiring response"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low"],
+      "description": "Incident severity level"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["New", "Investigating", "Contained", "Resolved", "Closed"],
+      "description": "Current incident lifecycle state"
+    },
+    "riskScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Risk score from alert triage (0-100)"
+    },
+    "entities": {
+      "type": "array",
+      "description": "Entities involved in the incident (users, hosts, IPs, files, etc.)",
+      "items": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["user", "host", "ip", "url", "file", "process", "email", "domain", "hash"],
+            "description": "Type of entity"
+          },
+          "value": {
+            "type": "string",
+            "description": "Entity identifier"
+          },
+          "criticality": {
+            "type": "string",
+            "enum": ["Low", "Medium", "High", "Critical"],
+            "description": "Entity criticality level"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Additional entity-specific properties",
+            "additionalProperties": true
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "selectedPlaybook": {
+      "type": "string",
+      "description": "Playbook to execute for this incident type",
+      "examples": ["malware-containment", "account-compromise-response", "ransomware-response"]
+    },
+    "requestedActions": {
+      "type": "array",
+      "description": "Specific actions requested (if not using full playbook)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "isolate_endpoint",
+          "disable_account",
+          "block_ip",
+          "block_url",
+          "block_file_hash",
+          "terminate_process",
+          "reset_password",
+          "revoke_sessions",
+          "quarantine_email",
+          "collect_forensics",
+          "memory_dump",
+          "disk_image"
+        ]
+      }
+    },
+    "requiresApproval": {
+      "type": "boolean",
+      "description": "Whether human approval is required before executing actions (based on risk threshold)"
+    },
+    "approvalStatus": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected", "not_required"],
+      "description": "Current approval status"
+    },
+    "approvedBy": {
+      "type": "string",
+      "description": "User who approved the response actions",
+      "examples": ["analyst@contoso.com"]
+    },
+    "relatedAlerts": {
+      "type": "array",
+      "description": "Alert IDs that are part of this incident",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Additional context from triage and hunting",
+      "properties": {
+        "triageRationale": {"type": "string"},
+        "huntFindings": {"type": "array", "items": {"type": "string"}},
+        "threatIntelligence": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Response request timestamp"
+    }
+  }
+}

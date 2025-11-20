@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/events/hunt-trigger-event.schema.json",
+  "title": "HuntTriggerEvent",
+  "description": "Event schema for triggering automated threat hunts. Can be published by various agents or scheduled jobs to initiate proactive threat hunting.",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventTimestamp", "huntRequest"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "description": "Unique event identifier (UUID)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "hunt.trigger",
+      "description": "Event type identifier"
+    },
+    "eventVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Event schema version"
+    },
+    "eventTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event generation timestamp"
+    },
+    "source": {
+      "type": "object",
+      "required": ["system", "component"],
+      "properties": {
+        "system": {
+          "type": "string",
+          "const": "AgenticSOC"
+        },
+        "component": {
+          "type": "string",
+          "description": "Component that triggered the hunt",
+          "examples": ["IncidentResponseAgent", "ScheduledHuntJob", "AnalystRequest"]
+        }
+      }
+    },
+    "huntRequest": {
+      "type": "object",
+      "description": "Hunt request parameters (reference: threat-hunting-agent-input.schema.json)",
+      "required": ["huntId", "query", "mode"],
+      "properties": {
+        "huntId": {"type": "string", "pattern": "^HUNT-[0-9]{4}-[0-9]+$"},
+        "query": {"type": "string"},
+        "mode": {"type": "string", "enum": ["interactive", "automated", "scheduled"]},
+        "timeRange": {"type": "object"},
+        "dataSources": {"type": "array"},
+        "pivotContext": {"type": "object"},
+        "hypothesis": {"type": "string"},
+        "requestedBy": {"type": "string"}
+      }
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low"],
+      "description": "Hunt priority level"
+    },
+    "triggerReason": {
+      "type": "string",
+      "description": "Explanation of why this hunt was triggered",
+      "maxLength": 512
+    },
+    "relatedContext": {
+      "type": "object",
+      "description": "Context from triggering event",
+      "properties": {
+        "incidentId": {"type": "string"},
+        "alertIds": {"type": "array", "items": {"type": "string"}},
+        "entities": {"type": "array"}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "correlationId": {"type": "string"}
+      }
+    }
+  }
+}

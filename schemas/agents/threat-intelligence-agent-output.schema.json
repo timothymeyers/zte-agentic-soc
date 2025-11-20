@@ -1,0 +1,223 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/threat-intelligence-agent-output.schema.json",
+  "title": "ThreatIntelligenceOutput",
+  "description": "Output schema for Threat Intelligence Agent. Contains enriched indicator data, threat briefings, or vulnerability assessments.",
+  "type": "object",
+  "required": ["requestId", "requestType", "timestamp"],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "description": "Request identifier matching the input",
+      "pattern": "^TI-[0-9]{4}-[0-9]+$"
+    },
+    "requestType": {
+      "type": "string",
+      "enum": ["enrich_iocs", "threat_briefing", "emerging_threats", "vulnerability_assessment"],
+      "description": "Type of request that was processed"
+    },
+    "enrichedIndicators": {
+      "type": "array",
+      "description": "Enriched IOC data (for enrich_iocs request type)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string"},
+              "value": {"type": "string"}
+            }
+          },
+          "reputation": {
+            "type": "string",
+            "enum": ["Malicious", "Suspicious", "Unknown", "Clean"],
+            "description": "Reputation assessment"
+          },
+          "confidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Confidence score in assessment (0-100)"
+          },
+          "threatActor": {
+            "type": "string",
+            "description": "Known threat actor associated with this indicator"
+          },
+          "campaigns": {
+            "type": "array",
+            "description": "Known campaigns using this indicator",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "active": {"type": "boolean"}
+              }
+            }
+          },
+          "firstSeen": {
+            "type": "string",
+            "format": "date-time",
+            "description": "First observation timestamp"
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Most recent observation timestamp"
+          },
+          "sources": {
+            "type": "array",
+            "description": "Intelligence sources providing this data",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "reliability": {"type": "string", "enum": ["High", "Medium", "Low"]}
+              }
+            }
+          },
+          "mitreMapping": {
+            "type": "object",
+            "properties": {
+              "tactics": {"type": "array", "items": {"type": "string"}},
+              "techniques": {"type": "array", "items": {"type": "string"}}
+            }
+          },
+          "relatedIndicators": {
+            "type": "array",
+            "description": "Related IOCs from same campaign/actor",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string"},
+                "value": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "briefing": {
+      "type": "object",
+      "description": "Threat intelligence briefing (for threat_briefing request type)",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Executive summary of current threat landscape",
+          "maxLength": 4096
+        },
+        "keyThreats": {
+          "type": "array",
+          "description": "Key threats relevant to the organization",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "severity": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
+              "description": {"type": "string"},
+              "targetedIndustries": {"type": "array", "items": {"type": "string"}},
+              "tactics": {"type": "array", "items": {"type": "string"}},
+              "recommendedActions": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "emergingTrends": {
+          "type": "array",
+          "description": "Emerging threat trends and patterns",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trend": {"type": "string"},
+              "description": {"type": "string"},
+              "impactAssessment": {"type": "string"}
+            }
+          }
+        },
+        "relevantCampaigns": {
+          "type": "array",
+          "description": "Active campaigns targeting similar organizations",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "threatActor": {"type": "string"},
+              "description": {"type": "string"},
+              "indicators": {"type": "array", "items": {"type": "string"}},
+              "mitigations": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    "vulnerabilities": {
+      "type": "array",
+      "description": "Vulnerability assessment results (for vulnerability_assessment request type)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cveId": {
+            "type": "string",
+            "pattern": "^CVE-[0-9]{4}-[0-9]+$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low"]
+          },
+          "description": {"type": "string"},
+          "affectedAssets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {"type": "string"},
+                "criticality": {"type": "string"}
+              }
+            }
+          },
+          "exploitAvailable": {"type": "boolean"},
+          "activeExploitation": {"type": "boolean"},
+          "patchAvailable": {"type": "boolean"},
+          "mitigations": {"type": "array", "items": {"type": "string"}},
+          "priority": {
+            "type": "string",
+            "enum": ["Immediate", "High", "Medium", "Low"]
+          }
+        }
+      }
+    },
+    "emergingThreats": {
+      "type": "array",
+      "description": "New threats detected in threat feeds (for emerging_threats request type)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "threatId": {"type": "string"},
+          "name": {"type": "string"},
+          "severity": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
+          "description": {"type": "string"},
+          "relevanceScore": {"type": "integer", "minimum": 0, "maximum": 100},
+          "indicators": {"type": "array", "items": {"type": "string"}},
+          "recommendedActions": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Actionable recommendations based on intelligence",
+      "items": {
+        "type": "object",
+        "properties": {
+          "priority": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
+          "action": {"type": "string"},
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Intelligence gathering completion timestamp"
+    }
+  }
+}
