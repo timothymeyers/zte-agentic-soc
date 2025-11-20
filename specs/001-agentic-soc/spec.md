@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "Create an Agentic Security Operations Center (SOC) system with AI agents for alert triage, threat hunting, incident response, and threat intelligence based on Azure AI Foundry and Microsoft Security services"
 
+## Clarifications
+
+### Session 2025-11-20
+
+- Q: Which authentication mechanism should agents use to access Microsoft Security services (Sentinel, Defender, Entra ID)? → A: Azure Managed Identity with Entra ID RBAC (Option B), with configuration support for service principals with Azure Key Vault (Option A) as an alternative (implementation not required for MVP)
+- Q: What is the data retention requirement for security telemetry and audit logs? → A: Configurable retention with MVP default of 5 days hot storage
+- Q: Which containment actions should require human approval before execution? → A: Risk-scored threshold where actions on critical assets or irreversible operations require approval (Option C), with configurable thresholds and reasonable MVP demonstration limits
+- Q: What alert/event format should the Alert Triage Agent expect as input? → A: Microsoft Sentinel/Graph Security API format as canonical schema (Option B)
+- Q: What are the incident lifecycle states? → A: New → Investigating → Contained → Resolved → Closed
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Automated Alert Triage and Prioritization (Priority: P1)
@@ -113,7 +123,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 
 #### Alert Triage Agent Requirements
 
-- **FR-001**: System MUST automatically ingest security alerts from multiple sources (SIEM, endpoint detection, identity protection, cloud security)
+- **FR-001**: System MUST automatically ingest security alerts from multiple sources (SIEM, endpoint detection, identity protection, cloud security) using Microsoft Sentinel/Graph Security API format as the canonical schema
 - **FR-002**: System MUST analyze alert content and context to determine risk severity and priority level
 - **FR-003**: System MUST correlate related alerts from the same user, asset, or attack pattern into unified incidents
 - **FR-004**: System MUST filter false positive alerts based on known benign patterns and organizational context
@@ -141,7 +151,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-020**: System MUST block malicious indicators at relevant security controls (firewall, email gateway, web proxy)
 - **FR-021**: System MUST terminate malicious processes or scheduled tasks on affected systems
 - **FR-022**: System MUST document all response actions with timestamps, rationale, and outcomes
-- **FR-023**: System MUST follow configurable approval workflows for high-risk actions
+- **FR-023**: System MUST follow configurable approval workflows for high-risk actions, using risk-scored thresholds where actions on critical assets or irreversible operations require human approval
 - **FR-024**: System MUST support multi-step response playbooks for different incident types
 - **FR-025**: System MUST coordinate recovery actions (restore from backup, rebuild systems, reset credentials)
 - **FR-026**: System MUST verify that backdoors and persistence mechanisms are removed
@@ -176,16 +186,17 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-046**: System MUST scale to handle thousands of alerts per day and large volumes of telemetry data
 - **FR-047**: System MUST operate continuously (24x7) with high availability
 - **FR-048**: System MUST maintain data privacy and security for sensitive security information
-- **FR-049**: System MUST comply with data retention and evidence preservation requirements
+- **FR-049**: System MUST comply with configurable data retention requirements (MVP default: 5 days hot storage) and evidence preservation requirements
 - **FR-050**: System MUST provide dashboards and reporting for SOC management visibility
 - **FR-051**: System MUST support customization of agent behavior through configuration and feedback
 - **FR-052**: System MUST maintain explainability - all AI decisions must be transparent and understandable
+- **FR-053**: System MUST use Azure Managed Identity with Entra ID RBAC for agent authentication to Microsoft Security services, with configurable support for service principals with Azure Key Vault as an alternative
 
 ### Key Entities
 
 - **Alert**: Individual security event notification from a detection source, containing details about potential threats, affected assets, timing, and severity indicators
 
-- **Incident**: Correlated group of related alerts or hunting findings representing a confirmed or suspected security event requiring investigation and response
+- **Incident**: Correlated group of related alerts or hunting findings representing a confirmed or suspected security event requiring investigation and response. Incidents follow a defined lifecycle: New → Investigating → Contained → Resolved → Closed
 
 - **Indicator of Compromise (IOC)**: Observable artifact or evidence of potential intrusion, such as IP addresses, file hashes, domain names, or behavioral patterns
 
