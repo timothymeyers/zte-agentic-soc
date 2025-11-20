@@ -1,8 +1,15 @@
 # Clarification Questions for specs/001-agentic-soc
 
-**Status**: Awaiting Responses  
+**Status**: ✅ Responses Received and Integrated  
 **Created**: 2025-11-20  
+**Updated**: 2025-11-20  
 **Analyzer**: GitHub Copilot Clarification Agent
+
+---
+
+## ✅ All Questions Answered and Integrated
+
+All 5 clarification questions have been answered by the user and successfully integrated into `spec.md`. See the `## Clarifications` section in the spec for the recorded Q&A.
 
 ---
 
@@ -33,7 +40,11 @@ Azure Managed Identity with Entra ID RBAC is recommended because it:
 
 **Question**: Which authentication mechanism should agents use to access Microsoft Security services (Sentinel, Defender, Entra ID)?
 
-**Your Response**: _[Please reply with option letter (A-D), "recommended", or provide your own answer]_
+**Your Response**: ✅ **ANSWERED**: Option B (Azure Managed Identity with Entra ID RBAC), with configurable support for service principals with Azure Key Vault (Option A) as an alternative (implementation not required for MVP)
+
+**Integration Status**: ✅ Integrated into spec.md
+- Added to Clarifications section (Session 2025-11-20)
+- FR-053 added: "System MUST use Azure Managed Identity with Entra ID RBAC for agent authentication to Microsoft Security services, with configurable support for service principals with Azure Key Vault as an alternative"
 
 ---
 
@@ -51,7 +62,11 @@ Common SOC balance between investigation needs and cost optimization.
 
 **Format**: Short answer (<=5 words). Examples: "90 days", "1 year regulatory", "7 years compliance"
 
-**Your Response**: _[Please provide retention period or say "suggested"]_
+**Your Response**: ✅ **ANSWERED**: Configurable retention with MVP default of 5 days hot storage
+
+**Integration Status**: ✅ Integrated into spec.md
+- Added to Clarifications section (Session 2025-11-20)
+- FR-049 updated: "System MUST comply with configurable data retention requirements (MVP default: 5 days hot storage) and evidence preservation requirements"
 
 ---
 
@@ -80,7 +95,11 @@ Risk-scored threshold is recommended because it:
 
 **Question**: Which containment actions should require human approval before execution?
 
-**Your Response**: _[Please reply with option letter (A-D), "recommended", or provide your own answer]_
+**Your Response**: ✅ **ANSWERED**: Option C (Risk-scored threshold), with configurable thresholds and reasonable MVP demonstration limits
+
+**Integration Status**: ✅ Integrated into spec.md
+- Added to Clarifications section (Session 2025-11-20)
+- FR-023 updated: "System MUST follow configurable approval workflows for high-risk actions, using risk-scored thresholds where actions on critical assets or irreversible operations require human approval"
 
 ---
 
@@ -109,7 +128,11 @@ Microsoft Sentinel/Graph Security API format is recommended because it:
 
 **Question**: What alert/event format should the Alert Triage Agent expect as input?
 
-**Your Response**: _[Please reply with option letter (A-D), "recommended", or provide your own answer]_
+**Your Response**: ✅ **ANSWERED**: Option B (Microsoft Sentinel/Graph Security API format as canonical schema)
+
+**Integration Status**: ✅ Integrated into spec.md
+- Added to Clarifications section (Session 2025-11-20)
+- FR-001 updated: "System MUST automatically ingest security alerts from multiple sources (SIEM, endpoint detection, identity protection, cloud security) using Microsoft Sentinel/Graph Security API format as the canonical schema"
 
 ---
 
@@ -127,7 +150,11 @@ Standard incident response lifecycle aligned with NIST framework.
 
 **Format**: Short answer (<=5 words or comma-separated state names)
 
-**Your Response**: _[Please provide state sequence or say "suggested"]_
+**Your Response**: ✅ **ANSWERED**: New → Investigating → Contained → Resolved → Closed (suggested response accepted)
+
+**Integration Status**: ✅ Integrated into spec.md
+- Added to Clarifications section (Session 2025-11-20)
+- Incident entity updated: "Incidents follow a defined lifecycle: New → Investigating → Contained → Resolved → Closed"
 
 ---
 
@@ -140,7 +167,23 @@ These 5 questions address the highest-impact ambiguities across:
 - **Integration Design** (Q4): Input format defines data pipeline architecture
 - **Workflow Design** (Q5): State machine defines orchestration and UI flows
 
-**Recommendation**: Please provide answers to these questions before proceeding to `/speckit.plan` to minimize downstream rework risk.
+**Recommendation**: ✅ **COMPLETED** - All questions answered and integrated. Spec is ready for `/speckit.plan`.
+
+---
+
+## ✅ Integration Complete
+
+All 5 clarification responses have been successfully integrated into `spec.md`:
+
+1. **Q1 (Authentication)**: ✅ FR-053 added
+2. **Q2 (Data Retention)**: ✅ FR-049 updated  
+3. **Q3 (Approval Workflow)**: ✅ FR-023 updated
+4. **Q4 (Alert Format)**: ✅ FR-001 updated
+5. **Q5 (Incident States)**: ✅ Incident entity updated
+
+**View Integration**: See `## Clarifications` section in `spec.md` for recorded Q&A
+
+**Next Step**: Run `/speckit.plan` to generate implementation plan
 
 ---
 
