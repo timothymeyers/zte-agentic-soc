@@ -48,86 +48,143 @@ This document consolidates actionable items from the Judge Review that should be
 
 ---
 
-### 2. Define API Contracts and Event Schemas
+### 2. Define Agent Input/Output Contracts and Event Schemas
 
 **Current State**: Agent interfaces mentioned but no formal contracts
 
+**Important Note**: Since agents will be hosted in **Azure AI Foundry** (not as REST APIs), the contract definition approach differs from traditional microservices. AI Foundry agents are invoked via:
+- **Event-driven triggers** (Event Hubs, scheduled jobs)
+- **Microsoft Agent Framework** orchestration (agent-to-agent calls)
+- **Teams chat interface** (conversational invocation)
+
 **Action Required**:
-- [ ] Create `/api-specs` directory in repository
-- [ ] Define OpenAPI 3.0 specifications for each agent's REST interface:
-  - `alert-triage-agent-api.yaml`
-  - `threat-hunting-agent-api.yaml`
-  - `incident-response-agent-api.yaml`
-  - `threat-intelligence-agent-api.yaml`
-- [ ] Define JSON schemas for Event Hubs messages:
-  - `alert-ingestion-event.schema.json` (Microsoft Graph Security format)
-  - `triage-complete-event.schema.json`
-  - `response-complete-event.schema.json`
-  - `hunt-trigger-event.schema.json`
-- [ ] Document orchestrator API (if agents are invoked via HTTP vs events)
+- [ ] Create `/schemas` directory in repository
+- [ ] Define **Agent Input/Output Schemas** (JSON Schema format) for each agent:
+  - `alert-triage-agent-input.schema.json` - Input contract for triage agent
+  - `alert-triage-agent-output.schema.json` - Output contract for triage results
+  - `threat-hunting-agent-input.schema.json` - Natural language query + parameters
+  - `threat-hunting-agent-output.schema.json` - Hunt findings and recommendations
+  - `incident-response-agent-input.schema.json` - Incident details + selected playbook
+  - `incident-response-agent-output.schema.json` - Actions taken + verification status
+  - `threat-intelligence-agent-input.schema.json` - IOCs to enrich OR briefing request
+  - `threat-intelligence-agent-output.schema.json` - Enriched data + context
+- [ ] Define **Event Hubs Message Schemas** for event-driven architecture:
+  - `alert-ingestion-event.schema.json` (Microsoft Graph Security format - already standardized)
+  - `triage-complete-event.schema.json` - Published when triage finishes
+  - `response-complete-event.schema.json` - Published when containment done
+  - `hunt-trigger-event.schema.json` - Triggers automated hunt
+- [ ] Document **Orchestration Invocation Patterns**:
+  - How does orchestrator invoke an AI Foundry agent? (Microsoft Agent Framework SDK)
+  - How are responses handled? (Synchronous return vs event-driven callback)
+  - What context is passed between agents? (Cosmos DB state reference vs inline data)
 
-**Example Structure** (Alert Triage Agent API):
-```yaml
-openapi: 3.0.0
-info:
-  title: Alert Triage Agent API
-  version: 1.0.0
-  description: Analyzes security alerts and provides risk-based prioritization
-
-paths:
-  /triage:
-    post:
-      summary: Triage a security alert
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Alert'
-      responses:
-        200:
-          description: Triage completed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TriageResult'
-        
-components:
-  schemas:
-    Alert:
-      type: object
-      required: [alertId, source, severity, entities, timestamp]
-      properties:
-        alertId:
-          type: string
-          description: Unique alert identifier
-        source:
-          type: string
-          enum: [Sentinel, DefenderEndpoint, DefenderIdentity, DefenderCloud]
-        severity:
-          type: string
-          enum: [Critical, High, Medium, Low, Informational]
-        # ... additional fields
-    
-    TriageResult:
-      type: object
-      properties:
-        riskScore:
-          type: integer
-          minimum: 0
-          maximum: 100
-        priority:
-          type: string
-          enum: [Critical, High, Medium, Low]
-        rationale:
-          type: string
-          description: Natural language explanation of risk assessment
-        # ... additional fields
+**Example Structure** (Alert Triage Agent Input Schema):
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AlertTriageInput",
+  "description": "Input schema for Alert Triage Agent hosted in Azure AI Foundry",
+  "type": "object",
+  "required": ["alertId", "source", "severity", "entities", "timestamp"],
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "description": "Unique alert identifier from source system"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["Sentinel", "DefenderEndpoint", "DefenderIdentity", "DefenderCloud"],
+      "description": "Alert origin system"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low", "Informational"]
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "name": {"type": "string"}
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rawData": {
+      "type": "object",
+      "description": "Original alert payload from source system"
+    }
+  }
+}
 ```
 
-**Rationale**: API contracts enable parallel development, clear integration points, and contract testing. These are architectural decisions, not implementation details.
+**Example Structure** (Alert Triage Agent Output Schema):
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AlertTriageOutput",
+  "description": "Output schema for Alert Triage Agent",
+  "type": "object",
+  "required": ["alertId", "riskScore", "priority", "rationale", "processingTimestamp"],
+  "properties": {
+    "alertId": {
+      "type": "string"
+    },
+    "riskScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Calculated risk score"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low"]
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Natural language explanation from AI Foundry LLM"
+    },
+    "enrichment": {
+      "type": "object",
+      "properties": {
+        "userContext": {"type": "object"},
+        "assetContext": {"type": "object"},
+        "threatIntel": {"type": "object"}
+      }
+    },
+    "recommendedActions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "requiresApproval": {
+      "type": "boolean",
+      "description": "Flag indicating if human approval needed for recommended actions"
+    },
+    "processingTimestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
 
-**Note**: Can start with skeleton contracts and refine during implementation, but establish structure now.
+**Rationale**: Even for AI Foundry-hosted agents, defining input/output schemas is critical for:
+- **Orchestration logic**: Microsoft Agent Framework needs to know what data to pass
+- **Testing**: Validate agent responses match expected schema
+- **Evolution**: Schema versioning prevents breaking changes
+- **Documentation**: Clear contract for what each agent expects and returns
+
+**Implementation Approach**:
+1. Define schemas upfront (this task)
+2. Use schemas to validate inputs/outputs in orchestration layer
+3. AI Foundry agent prompts reference these schemas to ensure LLM outputs match format
+4. Teams chat interface uses schemas to parse user inputs into agent invocations
+
+**Note**: ℹ️ This is **more important** for AI Foundry agents than traditional REST APIs because LLM outputs can be unpredictable. Schemas + output validation ensure consistency.
 
 ---
 
