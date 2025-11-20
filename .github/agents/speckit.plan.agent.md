@@ -50,7 +50,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    For each unknown in Technical Context:
      Task: "Research {unknown} for {feature context}"
    For each technology choice:
-     Task: "Find best practices for {tech} in {domain}"
+     Task: "Find best practices for {tech} in {domain}. Use #Context7 and Microsoft-docs tools to help."
    ```
 
 3. **Consolidate findings** in `research.md` using format:
