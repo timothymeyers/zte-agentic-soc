@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/incident-response-agent-output.schema.json",
+  "title": "IncidentResponseOutput",
+  "description": "Output schema for Incident Response Agent. Contains actions executed, verification status, and incident state updates.",
+  "type": "object",
+  "required": ["incidentId", "status", "actionsExecuted", "timestamp"],
+  "properties": {
+    "incidentId": {
+      "type": "string",
+      "description": "Incident identifier matching the input",
+      "pattern": "^INC-[0-9]{4}-[0-9]+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial_success", "failed", "pending_approval", "cancelled"],
+      "description": "Overall response execution status"
+    },
+    "actionsExecuted": {
+      "type": "array",
+      "description": "List of response actions that were executed",
+      "items": {
+        "type": "object",
+        "required": ["actionId", "actionType", "status", "timestamp"],
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "description": "Unique action identifier",
+            "pattern": "^ACT-[0-9]{4}-[0-9]+$"
+          },
+          "actionType": {
+            "type": "string",
+            "description": "Type of action executed",
+            "examples": ["isolate_endpoint", "disable_account", "block_ip"]
+          },
+          "target": {
+            "type": "object",
+            "description": "Entity that was targeted by this action",
+            "properties": {
+              "type": {"type": "string"},
+              "value": {"type": "string"}
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed", "skipped", "requires_manual"],
+            "description": "Action execution status"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Natural language explanation of why this action was taken",
+            "maxLength": 1024
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Action execution timestamp"
+          },
+          "executionTimeMs": {
+            "type": "integer",
+            "description": "Time taken to execute this action in milliseconds",
+            "minimum": 0
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": ["verified", "failed_verification", "not_verified"],
+            "description": "Whether action was verified successful"
+          },
+          "result": {
+            "type": "object",
+            "description": "Action-specific result data",
+            "additionalProperties": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "Error message if action failed",
+            "maxLength": 512
+          }
+        }
+      }
+    },
+    "containmentStatus": {
+      "type": "object",
+      "description": "Overall containment status assessment",
+      "properties": {
+        "isContained": {
+          "type": "boolean",
+          "description": "Whether the incident is fully contained"
+        },
+        "partialContainment": {
+          "type": "boolean",
+          "description": "Whether partial containment was achieved"
+        },
+        "containmentVerified": {
+          "type": "boolean",
+          "description": "Whether containment actions were verified"
+        },
+        "remainingThreats": {
+          "type": "array",
+          "description": "Threats that still require action",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "recoveryActions": {
+      "type": "array",
+      "description": "Recovery actions recommended or executed",
+      "items": {
+        "type": "object",
+        "properties": {
+          "actionType": {"type": "string"},
+          "description": {"type": "string"},
+          "status": {"type": "string", "enum": ["recommended", "in_progress", "completed"]},
+          "requiresManual": {"type": "boolean"}
+        }
+      }
+    },
+    "forensicsData": {
+      "type": "object",
+      "description": "Forensic evidence collected during response",
+      "properties": {
+        "memoryDumps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hostname": {"type": "string"},
+              "path": {"type": "string"},
+              "size": {"type": "integer"},
+              "timestamp": {"type": "string", "format": "date-time"}
+            }
+          }
+        },
+        "diskImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hostname": {"type": "string"},
+              "path": {"type": "string"},
+              "size": {"type": "integer"},
+              "timestamp": {"type": "string", "format": "date-time"}
+            }
+          }
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {"type": "string"},
+              "path": {"type": "string"},
+              "timestamp": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    "persistenceMechanisms": {
+      "type": "array",
+      "description": "Persistence mechanisms identified and their remediation status",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "location": {"type": "string"},
+          "status": {"type": "string", "enum": ["identified", "removed", "failed_removal"]}
+        }
+      }
+    },
+    "updatedIncidentState": {
+      "type": "string",
+      "enum": ["New", "Investigating", "Contained", "Resolved", "Closed"],
+      "description": "Updated incident lifecycle state after response"
+    },
+    "followUpActions": {
+      "type": "array",
+      "description": "Follow-up actions required (manual or additional automation)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {"type": "string"},
+          "priority": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
+          "assignedTo": {"type": "string"},
+          "requiresManual": {"type": "boolean"}
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "Executive summary of response actions and outcomes",
+      "maxLength": 2048
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Response completion timestamp"
+    },
+    "totalExecutionTimeMs": {
+      "type": "integer",
+      "description": "Total response execution time in milliseconds",
+      "minimum": 0
+    }
+  }
+}

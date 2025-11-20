@@ -192,6 +192,15 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-052**: System MUST maintain explainability - all AI decisions must be transparent and understandable
 - **FR-053**: System MUST use Azure Managed Identity with Entra ID RBAC for agent authentication to Microsoft Security services, with configurable support for service principals with Azure Key Vault as an alternative
 
+#### Performance Requirements
+
+- **FR-054**: Alert ingestion MUST process incoming alerts with latency < 2 seconds at 95th percentile
+- **FR-055**: Alert triage MUST complete analysis within 5 seconds at 95th percentile
+- **FR-056**: Containment actions MUST execute within 60 seconds at 95th percentile
+- **FR-057**: Hunt queries MUST complete within 30 seconds at 95th percentile for Microsoft Sentinel queries, and within 5 minutes at 95th percentile for Microsoft Fabric deep search queries
+- **FR-058**: System MUST sustain processing of 10,000 alerts/day in MVP deployment, scaling to 100,000+ alerts/day in production deployment
+- **FR-059**: System MUST maintain 99.5% uptime (maximum 43 minutes downtime per month) for critical detection and response functions
+
 ### Key Entities
 
 - **Alert**: Individual security event notification from a detection source, containing details about potential threats, affected assets, timing, and severity indicators

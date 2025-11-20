@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/alert-triage-agent-input.schema.json",
+  "title": "AlertTriageInput",
+  "description": "Input schema for Alert Triage Agent hosted in Azure AI Foundry. Accepts security alerts in Microsoft Sentinel/Graph Security API format for analysis and prioritization.",
+  "type": "object",
+  "required": ["alertId", "source", "severity", "entities", "timestamp"],
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "description": "Unique alert identifier from source system",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "examples": ["ALT-2025-001234", "df9a8bc2-4e5f-6a7b-8c9d-0e1f2a3b4c5d"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["Sentinel", "DefenderEndpoint", "DefenderIdentity", "DefenderCloud", "DefenderOffice365"],
+      "description": "Alert origin system"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low", "Informational"],
+      "description": "Initial severity assessment from source system"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable alert title",
+      "maxLength": 256
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed alert description from source system",
+      "maxLength": 4096
+    },
+    "entities": {
+      "type": "array",
+      "description": "Entities involved in the alert (users, hosts, IPs, files, etc.)",
+      "items": {
+        "type": "object",
+        "required": ["type", "name"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["user", "host", "ip", "url", "file", "process", "registry", "email", "domain", "hash"],
+            "description": "Type of entity"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity identifier (username, hostname, IP address, etc.)"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Additional entity-specific properties",
+            "additionalProperties": true
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Alert creation timestamp in ISO 8601 format"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Optional correlation ID for grouping related alerts",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "tactics": {
+      "type": "array",
+      "description": "MITRE ATT&CK tactics associated with the alert",
+      "items": {
+        "type": "string"
+      }
+    },
+    "techniques": {
+      "type": "array",
+      "description": "MITRE ATT&CK techniques associated with the alert",
+      "items": {
+        "type": "string",
+        "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+      }
+    },
+    "rawData": {
+      "type": "object",
+      "description": "Original alert payload from source system for reference",
+      "additionalProperties": true
+    }
+  }
+}

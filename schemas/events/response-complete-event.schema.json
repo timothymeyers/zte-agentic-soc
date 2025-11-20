@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/events/response-complete-event.schema.json",
+  "title": "ResponseCompleteEvent",
+  "description": "Event schema published when Incident Response Agent completes containment actions. Triggers follow-up activities like threat hunting and audit logging.",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventTimestamp", "incidentId", "responseResult"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "description": "Unique event identifier (UUID)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "incident.response.complete",
+      "description": "Event type identifier"
+    },
+    "eventVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Event schema version"
+    },
+    "eventTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event generation timestamp"
+    },
+    "source": {
+      "type": "object",
+      "required": ["system", "component"],
+      "properties": {
+        "system": {
+          "type": "string",
+          "const": "AgenticSOC"
+        },
+        "component": {
+          "type": "string",
+          "const": "IncidentResponseAgent"
+        }
+      }
+    },
+    "incidentId": {
+      "type": "string",
+      "description": "Incident identifier that was responded to",
+      "pattern": "^INC-[0-9]{4}-[0-9]+$"
+    },
+    "responseResult": {
+      "type": "object",
+      "description": "Response execution results (reference: incident-response-agent-output.schema.json)",
+      "required": ["status", "actionsExecuted"],
+      "properties": {
+        "status": {"type": "string", "enum": ["success", "partial_success", "failed", "pending_approval", "cancelled"]},
+        "actionsExecuted": {"type": "array"},
+        "containmentStatus": {"type": "object"},
+        "updatedIncidentState": {"type": "string"},
+        "summary": {"type": "string"}
+      }
+    },
+    "triggerActions": {
+      "type": "object",
+      "description": "Actions to be triggered by downstream consumers",
+      "properties": {
+        "threatHunting": {
+          "type": "boolean",
+          "description": "Whether to trigger proactive threat hunt for related activity"
+        },
+        "postIncidentReview": {
+          "type": "boolean",
+          "description": "Whether post-incident review is required"
+        },
+        "updateThreatIntel": {
+          "type": "boolean",
+          "description": "Whether to update threat intelligence repository with new IOCs"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "correlationId": {"type": "string"},
+        "totalExecutionTimeMs": {"type": "integer", "minimum": 0},
+        "relatedAlerts": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

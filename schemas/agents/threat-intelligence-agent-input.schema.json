@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/threat-intelligence-agent-input.schema.json",
+  "title": "ThreatIntelligenceInput",
+  "description": "Input schema for Threat Intelligence Agent. Accepts IOCs to enrich or requests for threat intelligence briefings.",
+  "type": "object",
+  "required": ["requestType"],
+  "properties": {
+    "requestType": {
+      "type": "string",
+      "enum": ["enrich_iocs", "threat_briefing", "emerging_threats", "vulnerability_assessment"],
+      "description": "Type of threat intelligence request"
+    },
+    "requestId": {
+      "type": "string",
+      "description": "Unique request identifier",
+      "pattern": "^TI-[0-9]{4}-[0-9]+$",
+      "examples": ["TI-2025-001234"]
+    },
+    "indicators": {
+      "type": "array",
+      "description": "Indicators of Compromise to enrich (required for enrich_iocs request type)",
+      "items": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["ip", "url", "domain", "file_hash", "email", "user_agent", "registry_key", "mutex"],
+            "description": "Type of indicator"
+          },
+          "value": {
+            "type": "string",
+            "description": "Indicator value"
+          },
+          "context": {
+            "type": "string",
+            "description": "Context where this indicator was observed",
+            "maxLength": 512
+          }
+        }
+      }
+    },
+    "briefingContext": {
+      "type": "object",
+      "description": "Context for threat briefing request",
+      "properties": {
+        "industry": {
+          "type": "string",
+          "description": "Organization's industry sector",
+          "examples": ["financial", "healthcare", "technology", "retail", "government"]
+        },
+        "geography": {
+          "type": "array",
+          "description": "Geographic regions of interest",
+          "items": {"type": "string"}
+        },
+        "threatActors": {
+          "type": "array",
+          "description": "Specific threat actors to focus on",
+          "items": {"type": "string"}
+        },
+        "timeRange": {
+          "type": "string",
+          "description": "Time range for briefing",
+          "examples": ["last 24 hours", "last 7 days", "last 30 days"]
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "Organizational assets to assess for vulnerabilities",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "identifier": {"type": "string"},
+          "version": {"type": "string"},
+          "criticality": {"type": "string", "enum": ["Low", "Medium", "High", "Critical"]}
+        }
+      }
+    },
+    "incidentContext": {
+      "type": "object",
+      "description": "Related incident context for intelligence gathering",
+      "properties": {
+        "incidentId": {"type": "string"},
+        "incidentType": {"type": "string"},
+        "observedTactics": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "requestedBy": {
+      "type": "string",
+      "description": "User or agent requesting intelligence",
+      "examples": ["analyst@contoso.com", "AlertTriageAgent"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Request timestamp"
+    }
+  }
+}

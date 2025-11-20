@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/events/triage-complete-event.schema.json",
+  "title": "TriageCompleteEvent",
+  "description": "Event schema published when Alert Triage Agent completes analysis. Triggers downstream processing by Incident Response and Threat Intelligence agents.",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventTimestamp", "alertId", "triageResult"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "description": "Unique event identifier (UUID)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "alert.triage.complete",
+      "description": "Event type identifier"
+    },
+    "eventVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Event schema version"
+    },
+    "eventTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event generation timestamp"
+    },
+    "source": {
+      "type": "object",
+      "required": ["system", "component"],
+      "properties": {
+        "system": {
+          "type": "string",
+          "const": "AgenticSOC"
+        },
+        "component": {
+          "type": "string",
+          "const": "AlertTriageAgent"
+        }
+      }
+    },
+    "alertId": {
+      "type": "string",
+      "description": "Alert identifier that was triaged"
+    },
+    "triageResult": {
+      "type": "object",
+      "description": "Triage analysis results (reference: alert-triage-agent-output.schema.json)",
+      "required": ["riskScore", "priority", "rationale"],
+      "properties": {
+        "riskScore": {"type": "integer", "minimum": 0, "maximum": 100},
+        "priority": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
+        "rationale": {"type": "string"},
+        "requiresApproval": {"type": "boolean"},
+        "suggestedIncidentId": {"type": "string"},
+        "isFalsePositive": {"type": "boolean"},
+        "recommendedActions": {"type": "array", "items": {"type": "string"}},
+        "enrichment": {"type": "object"}
+      }
+    },
+    "triggerActions": {
+      "type": "object",
+      "description": "Actions to be triggered by downstream consumers",
+      "properties": {
+        "incidentResponse": {
+          "type": "boolean",
+          "description": "Whether to trigger Incident Response Agent"
+        },
+        "threatHunting": {
+          "type": "boolean",
+          "description": "Whether to trigger Threat Hunting Agent"
+        },
+        "threatIntelligence": {
+          "type": "boolean",
+          "description": "Whether to enrich with additional threat intelligence"
+        },
+        "humanReview": {
+          "type": "boolean",
+          "description": "Whether human analyst review is required"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "correlationId": {"type": "string"},
+        "processingTimeMs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

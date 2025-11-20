@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/threat-hunting-agent-output.schema.json",
+  "title": "ThreatHuntingOutput",
+  "description": "Output schema for Threat Hunting Agent. Contains hunt findings, anomalies detected, and recommended follow-up actions.",
+  "type": "object",
+  "required": ["huntId", "status", "findings", "timestamp"],
+  "properties": {
+    "huntId": {
+      "type": "string",
+      "description": "Hunt identifier matching the input",
+      "pattern": "^HUNT-[0-9]{4}-[0-9]+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "partial", "failed", "no_results"],
+      "description": "Hunt execution status"
+    },
+    "findings": {
+      "type": "array",
+      "description": "List of hunting findings and anomalies detected",
+      "items": {
+        "type": "object",
+        "required": ["findingId", "severity", "description"],
+        "properties": {
+          "findingId": {
+            "type": "string",
+            "description": "Unique finding identifier",
+            "pattern": "^FIND-[0-9]{4}-[0-9]+$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Informational"],
+            "description": "Assessed severity of the finding"
+          },
+          "description": {
+            "type": "string",
+            "description": "Natural language description of what was found",
+            "minLength": 20,
+            "maxLength": 2048
+          },
+          "suspiciousActivity": {
+            "type": "string",
+            "description": "Explanation of why this activity is suspicious",
+            "maxLength": 1024
+          },
+          "entities": {
+            "type": "array",
+            "description": "Entities involved in this finding",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string"},
+                "value": {"type": "string"},
+                "properties": {"type": "object", "additionalProperties": true}
+              }
+            }
+          },
+          "timeline": {
+            "type": "object",
+            "description": "Timeline of suspicious events",
+            "properties": {
+              "firstSeen": {"type": "string", "format": "date-time"},
+              "lastSeen": {"type": "string", "format": "date-time"},
+              "eventCount": {"type": "integer", "minimum": 1}
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "description": "Evidence supporting this finding",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string"},
+                "source": {"type": "string"},
+                "data": {"type": "object", "additionalProperties": true}
+              }
+            }
+          },
+          "mitreMapping": {
+            "type": "object",
+            "description": "MITRE ATT&CK framework mapping",
+            "properties": {
+              "tactics": {"type": "array", "items": {"type": "string"}},
+              "techniques": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    "queriesExecuted": {
+      "type": "array",
+      "description": "List of queries that were executed during the hunt",
+      "items": {
+        "type": "object",
+        "properties": {
+          "dataSource": {"type": "string"},
+          "query": {"type": "string"},
+          "resultCount": {"type": "integer", "minimum": 0},
+          "executionTimeMs": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "anomaliesDetected": {
+      "type": "array",
+      "description": "Behavioral anomalies or statistical outliers detected",
+      "items": {
+        "type": "object",
+        "properties": {
+          "anomalyType": {"type": "string"},
+          "description": {"type": "string"},
+          "deviationScore": {"type": "number"},
+          "baselineValue": {"type": "string"},
+          "observedValue": {"type": "string"}
+        }
+      }
+    },
+    "recommendedActions": {
+      "type": "array",
+      "description": "Recommended follow-up actions based on findings",
+      "items": {
+        "type": "string",
+        "examples": [
+          "Create alert for continued monitoring",
+          "Escalate to incident response",
+          "Investigate related user accounts",
+          "Review asset configurations"
+        ]
+      }
+    },
+    "pivotSuggestions": {
+      "type": "array",
+      "description": "Suggested next hunt queries to further investigate findings",
+      "items": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+    "shouldCreateAlert": {
+      "type": "boolean",
+      "description": "Flag indicating if findings warrant creating new alert(s)"
+    },
+    "shouldCreateIncident": {
+      "type": "boolean",
+      "description": "Flag indicating if findings warrant creating a new incident"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Executive summary of hunt results in natural language",
+      "maxLength": 2048
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hunt completion timestamp"
+    },
+    "totalExecutionTimeMs": {
+      "type": "integer",
+      "description": "Total hunt execution time in milliseconds",
+      "minimum": 0
+    }
+  }
+}

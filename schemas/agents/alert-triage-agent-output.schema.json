@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/timothymeyers/zte-agentic-soc/schemas/agents/alert-triage-agent-output.schema.json",
+  "title": "AlertTriageOutput",
+  "description": "Output schema for Alert Triage Agent. Contains risk assessment, priority determination, and enrichment data for the alert.",
+  "type": "object",
+  "required": ["alertId", "riskScore", "priority", "rationale", "processingTimestamp"],
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "description": "Alert identifier matching the input",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "riskScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Calculated risk score (0-100) based on alert severity, asset criticality, user risk, and threat intelligence"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low"],
+      "description": "Determined priority level for SOC analyst queue"
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Natural language explanation from AI Foundry LLM describing why this priority was assigned",
+      "minLength": 50,
+      "maxLength": 2048
+    },
+    "enrichment": {
+      "type": "object",
+      "description": "Contextual enrichment data gathered during triage",
+      "properties": {
+        "userContext": {
+          "type": "object",
+          "description": "User account information (role, department, risk score, recent activities)",
+          "properties": {
+            "username": {"type": "string"},
+            "displayName": {"type": "string"},
+            "department": {"type": "string"},
+            "title": {"type": "string"},
+            "riskLevel": {"type": "string", "enum": ["Low", "Medium", "High", "Critical"]},
+            "recentIncidents": {"type": "integer", "minimum": 0}
+          }
+        },
+        "assetContext": {
+          "type": "object",
+          "description": "Asset information (criticality, ownership, sensitivity)",
+          "properties": {
+            "hostname": {"type": "string"},
+            "ipAddress": {"type": "string"},
+            "criticalityLevel": {"type": "string", "enum": ["Low", "Medium", "High", "Critical"]},
+            "owner": {"type": "string"},
+            "operatingSystem": {"type": "string"},
+            "dataClassification": {"type": "string", "enum": ["Public", "Internal", "Confidential", "Restricted"]}
+          }
+        },
+        "threatIntel": {
+          "type": "object",
+          "description": "Threat intelligence enrichment for IOCs",
+          "properties": {
+            "matchedIndicators": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "indicator": {"type": "string"},
+                  "type": {"type": "string"},
+                  "reputation": {"type": "string", "enum": ["Malicious", "Suspicious", "Unknown", "Clean"]},
+                  "threatActor": {"type": "string"},
+                  "confidence": {"type": "integer", "minimum": 0, "maximum": 100}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "recommendedActions": {
+      "type": "array",
+      "description": "List of recommended response actions",
+      "items": {
+        "type": "string",
+        "examples": ["Isolate endpoint", "Disable user account", "Block IP address", "Initiate threat hunt"]
+      }
+    },
+    "requiresApproval": {
+      "type": "boolean",
+      "description": "Flag indicating if human approval needed for recommended actions (based on risk threshold)"
+    },
+    "correlatedAlerts": {
+      "type": "array",
+      "description": "List of related alert IDs that should be grouped into an incident",
+      "items": {
+        "type": "string"
+      }
+    },
+    "suggestedIncidentId": {
+      "type": "string",
+      "description": "Incident ID to assign this alert to (existing or new)",
+      "pattern": "^INC-[0-9]{4}-[0-9]+$"
+    },
+    "isFalsePositive": {
+      "type": "boolean",
+      "description": "Flag indicating if alert is assessed as a false positive"
+    },
+    "falsePositiveReason": {
+      "type": "string",
+      "description": "Explanation if alert is marked as false positive",
+      "maxLength": 1024
+    },
+    "processingTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when triage processing completed"
+    },
+    "processingTimeMs": {
+      "type": "integer",
+      "description": "Processing duration in milliseconds",
+      "minimum": 0
+    }
+  }
+}
