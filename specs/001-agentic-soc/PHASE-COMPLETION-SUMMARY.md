@@ -17,8 +17,10 @@
 
 1. **AI Platform**: Azure AI Foundry with Python SDK
    - Persistent agents with managed state
-   - GPT-4o-mini for all agents (reasoning, explanations)
+   - **MVP**: GPT-4o-mini (2024-07-18) for all agents (cost-optimized: $234/month)
+   - **Production**: GPT-4.1-mini for Triage/Intelligence, GPT-4.1 for Hunting/Response (performance-optimized)
    - text-embedding-3-large for similarity/matching
+   - **See**: [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for comprehensive analysis
 
 2. **Orchestration**: Microsoft Agent Framework + Event-Driven Architecture
    - Agent-to-agent (A2A) communication

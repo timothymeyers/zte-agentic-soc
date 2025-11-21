@@ -23,6 +23,10 @@ The Agentic SOC MVP is an AI-first security operations platform that uses specia
 - `pandas` / `polars` (dataset processing)
 - `fastapi` (API endpoints for human approvals/feedback)
 
+**AI Models** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for full analysis):
+- **MVP**: GPT-4o-mini (2024-07-18) for all agents - cost-optimized ($234/month for full system)
+- **Production**: Differentiated - GPT-4.1-mini for high-volume agents (Triage, Intelligence), GPT-4.1 for complex/critical agents (Hunting, Response)
+
 **Storage**: 
 - Microsoft Sentinel incidents (shared context for agents)
 - Azure Cosmos DB (agent state, audit logs, configuration)

@@ -46,10 +46,21 @@ async def create_triage_agent():
         return agent
 ```
 
-2. **Model Selection**:
-   - **GPT-4o-mini**: Reasoning, explanations, risk scoring (primary model for all agents)
+2. **Model Selection** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for comprehensive analysis):
+   
+   **MVP Phase** (Cost-Optimized):
+   - **GPT-4o-mini (2024-07-18)**: All agents (reasoning, explanations, risk scoring)
+     - 60% cheaper than GPT-4o, 82% MMLU score, fastest in GPT-4 family
+     - Lifecycle: 15+ months (retirement Sep 2025 → Feb 2026)
+     - Cost: ~$234/month for 10K alerts/day + hunting + response + intelligence
    - **text-embedding-3-large**: Alert similarity, threat intelligence matching
-   - **GPT-4o**: Complex scenarios requiring advanced reasoning (fallback for critical decisions)
+   
+   **Production Phase** (Performance-Optimized):
+   - **GPT-4.1-mini** (Apr 2025): Alert Triage + Threat Intelligence (high volume, cost-sensitive)
+   - **GPT-4.1** (Apr 2025): Threat Hunting + Incident Response (complex reasoning, safety-critical)
+   - **Migration Timeline**: Q2 2025 evaluation → Q3 2025 production deployment
+   
+   **Rationale**: GPT-4o-mini provides excellent cost/performance for MVP. Production differentiates models by agent requirements: high-volume agents (triage) use cost-optimized mini models, while complex/critical agents (hunting, response) use advanced reasoning models. GPT-4.1 family offers longer lifecycle and enhanced capabilities.
 
 3. **Deployment Model**:
    - **Azure Container Apps**: Host agent application code (FastAPI backend, orchestration logic)
