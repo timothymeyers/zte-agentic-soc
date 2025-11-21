@@ -301,7 +301,7 @@ Comprehensive, professional documentation MUST be maintained to enable effective
 
 **API Documentation** (REQUIRED):
 - All web interfaces MUST be documented using OpenAPI 3.0 specifications
-- Agent-to-Agent (A2A) communication MAY use structured protocols (requires research) or natural language for coordination
+- Agent-to-Agent (A2A) communication is a formal protocol/framework (developed by Google) enabling agents to discover capabilities, negotiate interactions, and collaborate securely. A2A uses HTTP(S)-based JSON-RPC or gRPC for structured agent coordination, and MAY also use natural language for communication
 - Agents MAY leverage Model Context Protocol (MCP) for tool and resource discovery
 - Event schemas for Event Hubs or message buses MUST be documented with JSON Schema
 - Integration adapter contracts MUST be specified with request/response examples
