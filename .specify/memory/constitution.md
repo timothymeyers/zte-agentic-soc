@@ -300,7 +300,9 @@ Comprehensive, professional documentation MUST be maintained to enable effective
 - **Sequence Diagrams**: Document key workflows (alert triage, incident response, threat hunting, intelligence enrichment)
 
 **API Documentation** (REQUIRED):
-- All agent interfaces MUST be documented using OpenAPI 3.0 specifications
+- All web interfaces MUST be documented using OpenAPI 3.0 specifications
+- Agent-to-Agent (A2A) communication MAY use structured protocols (requires research) or natural language for coordination
+- Agents MAY leverage Model Context Protocol (MCP) for tool and resource discovery
 - Event schemas for Event Hubs or message buses MUST be documented with JSON Schema
 - Integration adapter contracts MUST be specified with request/response examples
 - API documentation MUST be automatically generated and kept in sync with code
