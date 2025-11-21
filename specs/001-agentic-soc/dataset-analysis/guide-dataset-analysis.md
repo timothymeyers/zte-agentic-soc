@@ -272,7 +272,7 @@ ensure that agents developed with this data will generalize well to production s
 
 ### Visualizations
 
-See the `mock-data-analysis/` directory for generated visualizations:
+See the `charts/guide-dataset/` directory for generated visualizations:
 
 - `incident_grade_distribution.png` - Distribution of incident grades
 - `top_categories.png` - Most common attack categories

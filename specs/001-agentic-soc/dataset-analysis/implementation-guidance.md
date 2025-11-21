@@ -4,9 +4,9 @@
 **Date**: 2025-11-21  
 **Purpose**: Bridge dataset analysis findings with Agentic SOC implementation planning  
 **Cross-Reference**: 
-- Dataset Analysis: `MOCK-DATA-ANALYSIS.md`
-- Architecture: `specs/001-agentic-soc/AgenticSOC_Architecture.md`
-- Specification: `specs/001-agentic-soc/spec.md`
+- Dataset Analysis: `guide-dataset-analysis.md`
+- Architecture: `../AgenticSOC_Architecture.md`
+- Specification: `../spec.md`
 
 ---
 
@@ -1371,7 +1371,7 @@ graph TB
 ### 8.3 For Data Scientist (Me)
 
 **Immediate Actions**:
-1. ✅ Dataset analysis complete (`MOCK-DATA-ANALYSIS.md`)
+1. ✅ Dataset analysis complete (`guide-dataset-analysis.md`)
 2. ✅ Implementation guidance complete (this document)
 3. ⚠️ **Create ML training notebook**:
    - Feature engineering from GUIDE dataset
@@ -1438,7 +1438,7 @@ The GUIDE dataset provides **excellent support** for implementing the Agentic SO
 
 ## Appendix: References
 
-- **Dataset Analysis**: `MOCK-DATA-ANALYSIS.md`
+- **Dataset Analysis**: `guide-dataset-analysis.md`
 - **Specification**: `specs/001-agentic-soc/spec.md`
 - **Architecture**: `specs/001-agentic-soc/AgenticSOC_Architecture.md`
 - **Pre-Implementation TODO**: `specs/001-agentic-soc/PRE-IMPLEMENTATION-TODO.md`
