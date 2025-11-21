@@ -21,7 +21,7 @@ These top-level agents may be composed of sub-agents, tools, or knowledge source
 
 ## Constitutional Principles
 
-This project is governed by a comprehensive constitution that establishes seven core principles for development and operations. See [`.specify/memory/constitution.md`](.specify/memory/constitution.md) for the complete framework.
+This project is governed by a comprehensive constitution that establishes eight core principles for development and operations. See [`.specify/memory/constitution.md`](.specify/memory/constitution.md) for the complete framework.
 
 **Key Principles**:
 - AI-First Security Operations
@@ -31,6 +31,7 @@ This project is governed by a comprehensive constitution that establishes seven 
 - Continuous Context Sharing
 - Explainability & Transparency
 - Continuous Learning & Adaptation
+- Observability & Operational Excellence
 
 ## Technology Stack
 
