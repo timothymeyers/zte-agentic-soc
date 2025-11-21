@@ -41,7 +41,11 @@ Verify compliance with `.specify/memory/constitution.md`:
 - [ ] **Continuous Context Sharing**: Are agents sharing context via A2A communication or shared stores? Are plugin points defined for Sentinel integration?
 - [ ] **Explainability & Transparency**: Do agent actions include natural language explanations and rationale?
 - [ ] **Continuous Learning & Adaptation**: Are feedback loops and learning mechanisms included (if applicable)?
+- [ ] **Observability & Operational Excellence**: Are structured logging, metrics, dashboards, and health checks implemented? Are Day 2 operations (runbooks, backup/recovery) planned?
 - [ ] **Technology Stack**: Are Microsoft Foundry (AI Foundry Client), Microsoft Agent Framework properly utilized? Is Microsoft Fabric considered for data storage? Are Logic Apps avoided?
+- [ ] **Code Quality & CI/CD**: Are code quality standards defined? Is CI/CD pipeline implemented with automated testing, security scanning, and deployment automation?
+- [ ] **Testing**: Are unit tests (80%+ coverage), integration tests, and contract tests included? Are edge cases covered?
+- [ ] **Documentation**: Are architecture diagrams (System Context, Component, Deployment, Data Flow, Sequence) included? Are API contracts documented with OpenAPI specs? Is technical writing clear and professional?
 - [ ] **Production Deployment** (for production features): Does the design align with Azure Landing Zone architecture? Are Azure Verified Modules considered? Does it follow Microsoft Cloud Adoption Framework and Well-Architected Framework principles?
 - [ ] **Security & Compliance**: Are data protection, access control, and incident handling requirements met?
 
