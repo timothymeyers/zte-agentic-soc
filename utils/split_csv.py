@@ -2,7 +2,7 @@
 import os
 import sys
 
-def split_csv(input_file, max_size_mb=200):
+def split_csv(input_file, max_size_mb=95):
     """Split a CSV file into smaller files while preserving headers."""
     max_size_bytes = max_size_mb * 1024 * 1024
     base_name = os.path.splitext(input_file)[0]
