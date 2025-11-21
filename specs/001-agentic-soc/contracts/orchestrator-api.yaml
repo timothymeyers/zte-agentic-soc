@@ -1,0 +1,298 @@
+openapi: 3.0.3
+info:
+  title: Agentic SOC Orchestrator API
+  description: |
+    REST API for human interaction with the Agentic SOC system.
+    Provides endpoints for approval workflows, feedback submission, and interactive hunting.
+  version: 1.0.0
+  contact:
+    name: Agentic SOC Team
+servers:
+  - url: https://{environment}.agenticsoc.azure.net/api/v1
+    description: Agentic SOC API
+    variables:
+      environment:
+        default: dev
+        enum:
+          - dev
+          - staging
+          - prod
+
+security:
+  - AzureAD: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: getHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+
+  /approvals:
+    get:
+      summary: List pending approval requests
+      operationId: listApprovals
+      tags:
+        - Approvals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Pending, Approved, Rejected]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: List of approval requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approvals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApprovalRequest'
+
+  /approvals/{approvalId}:
+    get:
+      summary: Get approval request details
+      operationId: getApproval
+      tags:
+        - Approvals
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Approval request details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRequest'
+    
+    post:
+      summary: Approve or reject an action
+      operationId: respondToApproval
+      tags:
+        - Approvals
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, approver]
+              properties:
+                decision:
+                  type: string
+                  enum: [Approve, Reject]
+                approver:
+                  type: string
+                  description: User principal name
+                comment:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Approval processed successfully
+        '404':
+          description: Approval request not found
+
+  /feedback:
+    post:
+      summary: Submit analyst feedback on triage result
+      operationId: submitFeedback
+      tags:
+        - Feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [triageId, feedbackType]
+              properties:
+                triageId:
+                  type: string
+                  format: uuid
+                feedbackType:
+                  type: string
+                  enum: [CorrectTriage, IncorrectTriage, MissedAlert, FalsePositive]
+                correctedRiskScore:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                correctedPriority:
+                  type: string
+                  enum: [Critical, High, Medium, Low]
+                comment:
+                  type: string
+                analystName:
+                  type: string
+      responses:
+        '201':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feedbackId:
+                    type: string
+                    format: uuid
+
+  /hunting/queries:
+    post:
+      summary: Submit interactive hunting query
+      operationId: submitHuntingQuery
+      tags:
+        - Hunting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query, analyst]
+              properties:
+                query:
+                  type: string
+                  description: Natural language hunting question
+                  example: "Show me all failed login attempts from external IPs in the last 24 hours"
+                timeRange:
+                  type: object
+                  properties:
+                    start:
+                      type: string
+                      format: date-time
+                    end:
+                      type: string
+                      format: date-time
+                analyst:
+                  type: string
+                  description: Analyst user principal name
+      responses:
+        '202':
+          description: Query accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queryId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [Pending]
+  
+  /hunting/queries/{queryId}:
+    get:
+      summary: Get hunting query results
+      operationId: getHuntingQueryResults
+      tags:
+        - Hunting
+      parameters:
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Query results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuntingQueryResult'
+
+components:
+  schemas:
+    ApprovalRequest:
+      type: object
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        actionId:
+          type: string
+          format: uuid
+        incidentId:
+          type: string
+          format: uuid
+        actionType:
+          type: string
+        targetEntity:
+          type: object
+        riskLevel:
+          type: string
+          enum: [Critical, High, Medium, Low]
+        rationale:
+          type: string
+        requestedBy:
+          type: string
+        requestedTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [Pending, Approved, Rejected]
+    
+    HuntingQueryResult:
+      type: object
+      properties:
+        queryId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Pending, Running, Completed, Failed]
+        kql:
+          type: string
+          description: Generated KQL query
+        findings:
+          type: array
+          items:
+            type: object
+        executionTimeMs:
+          type: integer
+
+  securitySchemes:
+    AzureAD:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+          tokenUrl: https://login.microsoftonline.com/common/oauth2/v2.0/token
+          scopes:
+            api://agentic-soc/.default: Access Agentic SOC API

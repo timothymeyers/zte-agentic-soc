@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentic-soc.example.com/schemas/alert-triage-output.json",
+  "title": "AlertTriageOutput",
+  "description": "Output schema for Alert Triage Agent",
+  "type": "object",
+  "required": ["triageId", "alertId", "timestamp", "riskScore", "priority", "triageDecision", "explanation"],
+  "properties": {
+    "triageId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique triage result identifier"
+    },
+    "alertId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Reference to input alert"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Triage completion timestamp (ISO 8601)"
+    },
+    "riskScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Calculated risk score (0=lowest, 100=highest)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low"],
+      "description": "Triage priority level"
+    },
+    "triageDecision": {
+      "type": "string",
+      "enum": [
+        "EscalateToIncident",
+        "CorrelateWithExisting",
+        "MarkAsFalsePositive",
+        "RequireHumanReview"
+      ],
+      "description": "Triage decision outcome"
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 50,
+      "maxLength": 2000,
+      "description": "Natural language explanation of triage decision and risk factors"
+    },
+    "correlatedAlertIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "IDs of related alerts that were correlated"
+    },
+    "recommendedIncidentId": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Existing incident to correlate with, or null to create new"
+    },
+    "enrichmentData": {
+      "type": "object",
+      "properties": {
+        "assetCriticality": {
+          "type": "string",
+          "enum": ["Critical", "High", "Medium", "Low"]
+        },
+        "userRiskLevel": {
+          "type": "string",
+          "enum": ["High", "Medium", "Low"]
+        },
+        "threatIntelligenceMatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ioc", "iocType", "reputation"],
+            "properties": {
+              "ioc": {
+                "type": "string"
+              },
+              "iocType": {
+                "type": "string",
+                "enum": ["IP", "Domain", "FileHash", "URL"]
+              },
+              "reputation": {
+                "type": "string",
+                "enum": ["Malicious", "Suspicious", "Unknown", "Benign"]
+              },
+              "source": {
+                "type": "string",
+                "description": "Intelligence source (e.g., 'Attack Dataset', 'MITRE')"
+              },
+              "context": {
+                "type": "string",
+                "description": "Additional context about the IOC"
+              }
+            }
+          }
+        },
+        "mitreTechniques": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "techniqueId": {
+                "type": "string",
+                "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+              },
+              "techniqueName": {
+                "type": "string"
+              },
+              "tactic": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "string",
+                "enum": ["High", "Medium", "Low"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "processingTimeMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Processing duration in milliseconds"
+    },
+    "agentVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Agent version (semver format)"
+    },
+    "modelUsed": {
+      "type": "string",
+      "description": "AI model deployment name used for triage"
+    }
+  }
+}
