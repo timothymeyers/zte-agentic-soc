@@ -9,7 +9,7 @@ This directory contains datasets used for implementing, testing, and demonstrati
 **Comprehensive cybersecurity attack scenarios dataset** with 14,133 entries covering 64 security categories and 8,834 unique attack types.
 
 - **Source**: https://www.kaggle.com/datasets/tannubarot/cybersecurity-attack-and-defence-dataset
-- **Analysis Report**: [Attack_Dataset_Analysis.md](./Attack_Dataset_Analysis.md)
+- **Analysis Report**: [Attack Dataset Analysis](../specs/001-agentic-soc/dataset-analysis/attack-dataset-analysis.md)
 - **Key Features**:
   - 99.8% MITRE ATT&CK technique coverage
   - Detailed attack scenarios with step-by-step procedures
@@ -23,24 +23,22 @@ This directory contains datasets used for implementing, testing, and demonstrati
 - Incident Response Agent: Automated playbook generation, containment actions
 - Threat Intelligence Agent: Threat briefings, indicator enrichment
 
-See the [comprehensive analysis report](./Attack_Dataset_Analysis.md) for detailed insights and implementation recommendations.
+See the [comprehensive analysis report](../specs/001-agentic-soc/dataset-analysis/attack-dataset-analysis.md) for detailed insights and implementation recommendations.
 
 ### GUIDE Dataset (Microsoft Security Incidents)
 
 **Time-series security incident data** for predictive modeling and trend analysis.
 
 - **Source**: https://www.kaggle.com/datasets/Microsoft/microsoft-security-incident-prediction
+- **Analysis Report**: [GUIDE Dataset Analysis](../specs/001-agentic-soc/dataset-analysis/guide-dataset-analysis.md)
+- **Implementation Guidance**: [Implementation Guidance](../specs/001-agentic-soc/dataset-analysis/implementation-guidance.md)
 - **Files**: GUIDE_Train_*.csv (25 files) and GUIDE_Test_*.csv (11 files)
-- **Status**: To be analyzed
+
+## Dataset Analysis
+
+All dataset analysis documentation, charts, and implementation guidance have been consolidated in:
+**[specs/001-agentic-soc/dataset-analysis/](../specs/001-agentic-soc/dataset-analysis/)**
 
 ## Data Licensing
 
-TODO: Need to address data licensing and citations for these datasets
-
-## Analysis Artifacts
-
-The `analysis-charts/` directory contains visualizations generated during dataset analysis:
-- Category distribution charts
-- Attack type analysis
-- Target type breakdown
-- Data quality metrics 
+TODO: Need to address data licensing and citations for these datasets 
