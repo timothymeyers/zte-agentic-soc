@@ -10,6 +10,7 @@ This agent uses the Microsoft Agent Framework with custom tools for:
 
 import asyncio
 import os
+import json
 from datetime import datetime
 from typing import Annotated, List, Dict, Any, Optional
 from uuid import UUID, uuid4
@@ -49,7 +50,7 @@ class AlertTriageTools:
         """Initialize alert triage tools."""
         self.attack_loader = get_attack_loader()
         self._recent_alerts: List[SecurityAlert] = []
-        logger.info("Alert triage tools initialized")
+        logger.info("Alert Triage Tools initialized")
     
     @ai_function(description="Calculate risk score for a security alert based on multiple factors")
     async def calculate_risk_score(
@@ -422,20 +423,20 @@ Please:
                 mitre_techniques=mitre_techniques,
                 confidence_score=confidence
             )
-            risk_data = eval(risk_result)  # Safe here as it's our own tool output
+            risk_data = json.loads(risk_result)  # Safe JSON parsing
             risk_score = risk_data["risk_score"]
             
             correlation_result = await self.tools.find_correlated_alerts(
                 alert_entities=entities_list
             )
-            correlation_data = eval(correlation_result)
+            correlation_data = json.loads(correlation_result)  # Safe JSON parsing
             correlated_alert_ids = [UUID(a["alert_id"]) for a in correlation_data.get("correlated_alerts", [])]
             
             decision_result = await self.tools.make_triage_decision(
                 risk_score=risk_score,
                 has_correlation=correlation_data.get("has_correlation", False)
             )
-            decision_data = eval(decision_result)
+            decision_data = json.loads(decision_result)  # Safe JSON parsing
             
             # Map decision strings to enums
             priority_map = {
