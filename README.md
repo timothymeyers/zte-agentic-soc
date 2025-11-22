@@ -83,7 +83,76 @@ All development follows the constitutional framework with emphasis on:
 
 ## Getting Started
 
-*Documentation for setup and deployment will be added as the MVP is implemented.*
+### Prerequisites
+
+1. **Python 3.11+** installed
+2. **Azure CLI** for authentication (`az login`)
+3. **Azure AI Foundry Project** (optional, for production-grade AI)
+4. **Git** for cloning the repository
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/timothymeyers/zte-agentic-soc.git
+cd zte-agentic-soc
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Quick Start - Alert Triage Agent Demo
+
+The Alert Triage Agent is implemented using **Microsoft Agent Framework** and can run with or without Azure AI Foundry:
+
+#### Option 1: With Azure AI Foundry (Recommended)
+
+```bash
+# Set up Azure AI Foundry project endpoint
+export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/api/projects/project-id"
+export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+
+# Authenticate with Azure
+az login
+
+# Run the demo
+python utils/demo_agent_framework.py
+```
+
+#### Option 2: Without Azure (OpenAI Fallback)
+
+```bash
+# No configuration needed - automatically uses OpenAI fallback
+python utils/demo_agent_framework.py
+```
+
+### What You'll See
+
+The demo showcases:
+- ✅ **Microsoft Agent Framework** integration with `ChatAgent`
+- ✅ **AI Function Tools** with `@ai_function` decorators
+- ✅ **Multi-factor risk scoring** (severity, entities, MITRE techniques, confidence)
+- ✅ **Alert correlation detection** by entity overlap
+- ✅ **AI-powered triage decisions** with natural language explanations
+- ✅ **Threat intelligence enrichment** from MITRE ATT&CK dataset
+- ✅ **Audit logging** and performance metrics
+
+### Architecture
+
+```
+GUIDE Dataset → Alert → ChatAgent (Framework) → AI Function Tools → GPT-4o → Triage Decision
+                                                    ↓
+                                    - calculate_risk_score
+                                    - find_correlated_alerts
+                                    - make_triage_decision
+                                    - get_mitre_context
+```
+
+### Documentation
+
+- **[Agent Framework Implementation](docs/AGENT-FRAMEWORK-IMPLEMENTATION.md)** - Complete architecture and usage guide
+- **[Framework Migration Summary](docs/FRAMEWORK-MIGRATION-SUMMARY.md)** - Before/after comparison
+- **[MVP Implementation Summary](docs/MVP-IMPLEMENTATION-SUMMARY.md)** - Overall project status
 
 ## License
 
