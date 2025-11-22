@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentic-soc.example.com/schemas/alert-triage-input.json",
+  "title": "AlertTriageInput",
+  "description": "Input schema for Alert Triage Agent hosted in Azure AI Foundry",
+  "type": "object",
+  "required": ["alertId", "alert"],
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique alert identifier (SystemAlertId)"
+    },
+    "alert": {
+      "type": "object",
+      "description": "Full alert object from Microsoft Sentinel/Graph Security API format",
+      "required": ["AlertName", "AlertType", "Severity", "Description", "TimeGenerated", "Entities"],
+      "properties": {
+        "SystemAlertId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "AlertName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "AlertType": {
+          "type": "string",
+          "description": "Unique alert type identifier"
+        },
+        "Severity": {
+          "type": "string",
+          "enum": ["High", "Medium", "Low", "Informational"]
+        },
+        "Description": {
+          "type": "string"
+        },
+        "TimeGenerated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "StartTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "EndTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "Entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["Type", "Properties"],
+            "properties": {
+              "Type": {
+                "type": "string",
+                "enum": ["Account", "Host", "IP", "File", "Process", "URL", "MailMessage", "CloudApplication"]
+              },
+              "Properties": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "ExtendedProperties": {
+          "type": "object",
+          "properties": {
+            "MitreTechniques": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+              }
+            },
+            "ConfidenceScore": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "ProviderName": {
+          "type": "string"
+        },
+        "ProductName": {
+          "type": "string"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional additional context for triage",
+      "properties": {
+        "relatedAlertIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "Previously seen related alerts (within 24h window)"
+        },
+        "assetCriticality": {
+          "type": "string",
+          "enum": ["Critical", "High", "Medium", "Low", "Unknown"],
+          "description": "Criticality of affected asset"
+        },
+        "userRiskLevel": {
+          "type": "string",
+          "enum": ["High", "Medium", "Low", "Unknown"],
+          "description": "Risk level of affected user (from Entra ID Protection)"
+        }
+      }
+    }
+  }
+}
