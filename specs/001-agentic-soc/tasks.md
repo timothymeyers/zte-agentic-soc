@@ -19,12 +19,12 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directory structure per plan.md: src/, tests/, infra/, docs/, schemas/, .github/workflows/
-- [ ] T002 Initialize Python project with requirements.txt for pip-based dependency management
-- [ ] T003 [P] Create .gitignore for Python (.venv/, __pycache__/, *.pyc, .env, logs/)
-- [ ] T004 [P] Create requirements.txt with core dependencies: azure-ai-projects, azure-identity, agent-framework, azure-monitor-opentelemetry, pydantic, pandas, fastapi, azure-search-documents, azure-cosmos
-- [ ] T005 [P] Setup environment template .env.example with Azure AI Foundry, Cosmos DB, Event Hubs, Application Insights configuration variables
-- [ ] T006 [P] Create README.md with project overview and quick start instructions
+- [X] T001 Create project directory structure per plan.md: src/, tests/, infra/, docs/, schemas/, .github/workflows/
+- [X] T002 Initialize Python project with requirements.txt for pip-based dependency management
+- [X] T003 [P] Create .gitignore for Python (.venv/, __pycache__/, *.pyc, .env, logs/)
+- [X] T004 [P] Create requirements.txt with core dependencies: azure-ai-projects, azure-identity, agent-framework, azure-monitor-opentelemetry, pydantic, pandas, fastapi, azure-search-documents, azure-cosmos
+- [X] T005 [P] Setup environment template .env.example with Azure AI Foundry, Cosmos DB, Event Hubs, Application Insights configuration variables
+- [X] T006 [P] Create README.md with project overview and quick start instructions
 
 ---
 
@@ -34,23 +34,23 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Create shared Pydantic models in src/shared/schemas.py: SeverityLevel, EntityType, AlertEntity, SecurityAlert per data-model.md
-- [ ] T008 [P] Create SecurityIncident model in src/shared/schemas.py with incident lifecycle states (New, Investigating, Contained, Resolved, Closed)
-- [ ] T009 [P] Create authentication module in src/shared/auth.py using Azure Managed Identity with DefaultAzureCredential
-- [ ] T010 [P] Create structured logging setup in src/shared/logging.py using structlog with JSON formatting
-- [ ] T011 [P] Create metrics collection module in src/shared/metrics.py with Prometheus counters and histograms
-- [ ] T012 Implement Cosmos DB client in src/data/cosmos.py with connection pooling and error handling
+- [X] T007 Create shared Pydantic models in src/shared/schemas.py: SeverityLevel, EntityType, AlertEntity, SecurityAlert per data-model.md
+- [X] T008 [P] Create SecurityIncident model in src/shared/schemas.py with incident lifecycle states (New, Investigating, Contained, Resolved, Closed)
+- [X] T009 [P] Create authentication module in src/shared/auth.py using Azure Managed Identity with DefaultAzureCredential
+- [X] T010 [P] Create structured logging setup in src/shared/logging.py using structlog with JSON formatting
+- [X] T011 [P] Create metrics collection module in src/shared/metrics.py with Prometheus counters and histograms
+- [X] T012 Implement Cosmos DB client in src/data/cosmos.py with connection pooling and error handling
 - [ ] T013 [P] Create Cosmos DB initialization script in utils/setup_cosmos_db.py to create collections: alerts, incidents, triage_results, response_actions, agent_state, audit_logs with TTL and partition keys per data-model.md
-- [ ] T014 [P] Create mock Sentinel API client in src/mock/sentinel_mock.py implementing SecurityAlert CRUD operations
-- [ ] T015 [P] Create mock Defender XDR API client in src/mock/defender_mock.py for containment actions (isolate endpoint, disable account, block IP)
-- [ ] T016 Implement GUIDE dataset loader in src/data/datasets.py to transform GUIDE records to Sentinel SecurityAlert schema
-- [ ] T017 [P] Implement Attack dataset loader in src/data/datasets.py for attack scenario lookup and MITRE ATT&CK mapping
-- [ ] T018 Create mock data streamer in src/mock/stream.py with configurable interval (default 15s) and checkpoint-based replay
-- [ ] T019 [P] Setup Event Hubs client wrapper in src/orchestration/event_handlers.py for alert ingestion events
-- [ ] T020 [P] Create FastAPI application scaffold in src/api/main.py with health and readiness endpoints
-- [ ] T021 [P] Configure Azure Monitor OpenTelemetry in src/shared/logging.py with distributed tracing using correlation IDs
-- [ ] T022 Create AuditLog model in src/shared/schemas.py for immutable audit trail with actor, action, target entity, result fields
-- [ ] T023 [P] Implement audit logging service in src/shared/audit.py that writes to Cosmos DB audit_logs collection
+- [X] T014 [P] Create mock Sentinel API client in src/mock/sentinel_mock.py implementing SecurityAlert CRUD operations
+- [X] T015 [P] Create mock Defender XDR API client in src/mock/defender_mock.py for containment actions (isolate endpoint, disable account, block IP)
+- [X] T016 Implement GUIDE dataset loader in src/data/datasets.py to transform GUIDE records to Sentinel SecurityAlert schema
+- [X] T017 [P] Implement Attack dataset loader in src/data/datasets.py for attack scenario lookup and MITRE ATT&CK mapping
+- [X] T018 Create mock data streamer in src/mock/stream.py with configurable interval (default 15s) and checkpoint-based replay
+- [X] T019 [P] Setup Event Hubs client wrapper in src/orchestration/event_handlers.py for alert ingestion events
+- [X] T020 [P] Create FastAPI application scaffold in src/api/main.py with health and readiness endpoints
+- [X] T021 [P] Configure Azure Monitor OpenTelemetry in src/shared/logging.py with distributed tracing using correlation IDs
+- [X] T022 Create AuditLog model in src/shared/schemas.py for immutable audit trail with actor, action, target entity, result fields
+- [X] T023 [P] Implement audit logging service in src/shared/audit.py that writes to Cosmos DB audit_logs collection
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
