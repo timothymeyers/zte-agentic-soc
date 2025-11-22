@@ -5,6 +5,8 @@ This module contains core data models used across all agents and services,
 aligned with Microsoft Sentinel/Graph Security API schemas where applicable.
 """
 
+from __future__ import annotations  # Enable forward references
+
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -293,16 +295,16 @@ class ResponseAction(BaseModel):
     """Containment/response action."""
     ActionId: UUID = Field(default_factory=uuid4)
     IncidentId: UUID
-    ActionType: ActionType
+    ActionType: "ActionType"
     TargetEntity: ResponseTargetEntity
-    Status: ActionStatus = Field(default=ActionStatus.PENDING)
+    Status: "ActionStatus" = Field(default_factory=lambda: ActionStatus.PENDING)
     RequestedBy: str
     RequestedTime: datetime = Field(default_factory=datetime.utcnow)
     ApprovedBy: Optional[str] = None
     ApprovedTime: Optional[datetime] = None
     ExecutedTime: Optional[datetime] = None
     CompletedTime: Optional[datetime] = None
-    RiskLevel: RiskLevel
+    RiskLevel: "RiskLevel"
     RequiresApproval: bool
     Rationale: str
     PlaybookId: Optional[UUID] = None
@@ -441,3 +443,9 @@ class AuditLog(BaseModel):
     CorrelationId: UUID = Field(default_factory=uuid4)
     ClientIP: Optional[str] = None
     UserAgent: Optional[str] = None
+
+
+# Rebuild models to resolve forward references
+ResponseAction.model_rebuild()
+SecurityIncident.model_rebuild()
+AuditLog.model_rebuild()

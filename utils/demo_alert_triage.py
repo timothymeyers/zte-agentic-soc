@@ -17,7 +17,7 @@ from src.agents.alert_triage.agent import get_triage_agent
 from src.data.datasets import get_guide_loader
 from src.shared.logging import configure_logging, get_logger
 from src.orchestration.orchestrator import get_orchestrator
-from src.orchestration.event_handlers import get_event_bus, EventType
+from src.orchestration.event_handlers import get_event_bus, OrchestrationEventType
 
 
 logger = get_logger(__name__)
@@ -62,7 +62,7 @@ async def demo_alert_triage():
         logger.info(f"   {triage_result.Explanation}")
         logger.info("")
     
-    event_bus.register(EventType.ALERT_INGESTION, handle_alert_event)
+    event_bus.register(OrchestrationEventType.ALERT_INGESTION, handle_alert_event)
     
     # Load sample alerts
     logger.info("\n🔍 Loading sample alerts from GUIDE dataset...")

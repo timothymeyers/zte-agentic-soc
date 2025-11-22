@@ -15,8 +15,8 @@ from src.shared.logging import get_logger
 logger = get_logger(__name__)
 
 
-class EventType(str, Enum):
-    """Types of events in the system."""
+class OrchestrationEventType(str, Enum):
+    """Types of events in the orchestration system."""
     ALERT_INGESTION = "alert_ingestion"
     TRIAGE_COMPLETE = "triage_complete"
     HIGH_RISK_ALERT = "high_risk_alert"
@@ -35,14 +35,14 @@ class EventBus:
     
     def __init__(self):
         """Initialize event bus."""
-        self._handlers: Dict[EventType, List[EventHandler]] = {
-            event_type: [] for event_type in EventType
+        self._handlers: Dict[OrchestrationEventType, List[EventHandler]] = {
+            event_type: [] for event_type in OrchestrationEventType
         }
         logger.info("Event bus initialized")
     
     def register(
         self,
-        event_type: EventType,
+        event_type: OrchestrationEventType,
         handler: EventHandler
     ) -> None:
         """
@@ -61,7 +61,7 @@ class EventBus:
     
     async def publish(
         self,
-        event_type: EventType,
+        event_type: OrchestrationEventType,
         event_data: Dict
     ) -> None:
         """
@@ -125,7 +125,7 @@ async def handle_alert_ingestion(alert: SecurityAlert) -> None:
     """
     event_bus = get_event_bus()
     await event_bus.publish(
-        EventType.ALERT_INGESTION,
+        OrchestrationEventType.ALERT_INGESTION,
         {
             "alert_id": str(alert.SystemAlertId),
             "alert_name": alert.AlertName,
@@ -145,7 +145,7 @@ async def handle_triage_complete(alert_id: str, triage_result: Dict) -> None:
     """
     event_bus = get_event_bus()
     await event_bus.publish(
-        EventType.TRIAGE_COMPLETE,
+        OrchestrationEventType.TRIAGE_COMPLETE,
         {
             "alert_id": alert_id,
             "triage_result": triage_result
@@ -163,7 +163,7 @@ async def handle_high_risk_alert(alert_id: str, risk_score: int) -> None:
     """
     event_bus = get_event_bus()
     await event_bus.publish(
-        EventType.HIGH_RISK_ALERT,
+        OrchestrationEventType.HIGH_RISK_ALERT,
         {
             "alert_id": alert_id,
             "risk_score": risk_score
@@ -181,7 +181,7 @@ async def handle_incident_created(incident_id: str, severity: str) -> None:
     """
     event_bus = get_event_bus()
     await event_bus.publish(
-        EventType.INCIDENT_CREATED,
+        OrchestrationEventType.INCIDENT_CREATED,
         {
             "incident_id": incident_id,
             "severity": severity

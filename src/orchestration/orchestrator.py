@@ -17,7 +17,7 @@ from src.shared.schemas import (
 )
 from src.shared.logging import get_logger, set_correlation_id
 from src.shared.metrics import counter
-from src.orchestration.event_handlers import get_event_bus, EventType
+from src.orchestration.event_handlers import get_event_bus, OrchestrationEventType
 
 
 logger = get_logger(__name__)
@@ -130,7 +130,7 @@ class Orchestrator:
         try:
             # Publish alert ingestion event
             await self.event_bus.publish(
-                EventType.ALERT_INGESTION,
+                OrchestrationEventType.ALERT_INGESTION,
                 {
                     "alert_id": str(alert.SystemAlertId),
                     "alert": alert.model_dump(),

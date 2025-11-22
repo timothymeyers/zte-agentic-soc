@@ -2,9 +2,9 @@
 # Python 3.11+ required
 
 # Azure AI and Agent Framework
-azure-ai-projects>=1.0.0
+# azure-ai-projects>=1.0.0  # Not yet available
 azure-identity>=1.15.0
-azure-ai-inference>=1.0.0
+# azure-ai-inference>=1.0.0b9  # Beta version
 
 # Data Processing and Validation
 pydantic>=2.5.0
