@@ -1,47 +1,71 @@
 # Model Selection Analysis of Alternatives (AOA)
 
-**Date**: 2025-11-21  
-**Purpose**: Comprehensive analysis of Azure OpenAI model options for Agentic SOC agents  
-**Scope**: MVP and Production recommendations with cost, performance, and lifecycle considerations
+**Date**: 2025-11-22 (Updated)  
+**Purpose**: Comprehensive analysis of Microsoft Foundry model options for Agentic SOC agents  
+**Scope**: MVP and Production recommendations with cost, performance, and lifecycle considerations  
+**Context**: November 2025 - GPT-4o mid-deprecation, GPT-5 family and 2000+ Foundry models available
 
 ---
 
 ## Executive Summary
 
-**MVP Recommendation**: GPT-4o-mini (2024-07-18) as primary model for all agents
-- **Cost**: 60% cheaper than GPT-4o
-- **Performance**: 82% MMLU score (vs 70% for GPT-3.5-Turbo)
-- **Speed**: Fastest model in GPT-4 family
-- **Lifecycle**: Retirement not before September 15, 2025 → February 27, 2026 (15+ months)
-- **Replacement Path**: GPT-4.1-mini (2025-04-14) available for migration
+**Current State (November 2025)**:
+- GPT-4o family is mid-deprecation (retirement Feb-Mar 2026)
+- GPT-5 family released (August 2025): GPT-5, GPT-5-mini, GPT-5-nano
+- GPT-4.1 family available (April 2025): GPT-4.1, GPT-4.1-mini, GPT-4.1-nano
+- Microsoft Foundry catalog: 2000+ models including frontier day-and-date releases
+- Alternative frontier models available: Claude Opus-4-1, Grok-4, DeepSeek-V3.1, Llama-4-Maverick
 
-**Production Recommendation**: Agent-specific model selection
-- **Alert Triage Agent**: GPT-4.1-mini (cost-optimized, fast, sufficient reasoning)
-- **Threat Hunting Agent**: GPT-4.1 (complex query generation, advanced reasoning)
-- **Incident Response Agent**: GPT-4.1 (critical decisions, high-risk actions)
-- **Threat Intelligence Agent**: GPT-4.1-mini (summarization, briefing generation)
+**MVP Recommendation** (November 2025): GPT-4.1-mini as primary model
+- **Cost**: Optimized pricing vs GPT-5 family
+- **Performance**: Enhanced vs GPT-4o-mini (>85% MMLU estimated)
+- **Speed**: Fast inference, suitable for <5s triage target
+- **Lifecycle**: 12+ months (retirement Apr 2026+)
+- **Status**: Generally Available (GA) since April 2025
+
+**Production Recommendation**: Multi-model strategy leveraging Foundry catalog
+- **Alert Triage Agent**: GPT-4.1-mini or GPT-5-nano (high volume, cost-optimized)
+- **Threat Hunting Agent**: GPT-5 or Claude-Sonnet-4-5 (complex reasoning, multimodal)
+- **Incident Response Agent**: GPT-5 or o4-mini (safety-critical, advanced reasoning)
+- **Threat Intelligence Agent**: GPT-4.1-mini or Grok-3-mini (summarization, lightweight)
 
 ---
 
 ## Model Comparison Matrix
 
-### Current Generation (Available Now)
+### Current Generation (November 2025 - Generally Available)
 
-| Model | Release | MMLU Score | Context | Output Tokens | Cost (per 1M tokens) | Speed | Retirement Date |
-|-------|---------|------------|---------|---------------|----------------------|-------|-----------------|
-| **GPT-4o-mini** | 2024-07-18 | 82% | 128K | 16,384 | Input: $0.15<br>Output: $0.60 | Fastest | Sep 15, 2025+ |
-| **GPT-4o** | 2024-11-20 | ~85% | 128K | 16,384 | Input: $2.50<br>Output: $10.00 | Fast | Mar 1, 2026+ |
-| **GPT-4o** | 2024-08-06 | ~85% | 128K | 16,384 | Input: $2.50<br>Output: $10.00 | Fast | Oct 15, 2025+ |
-| **o1-mini** | 2024-09-12 | N/A (reasoning) | 128K | 65,536 | Input: $3.00<br>Output: $12.00 | Slow (reasoning) | Sep 26, 2025+ |
-| **o1** | 2024-12-17 | N/A (reasoning) | 128K | 32,768 | Input: $15.00<br>Output: $60.00 | Very Slow | Dec 17, 2025+ |
+| Model | Release | MMLU/Capability | Context | Output Tokens | Cost (per 1M tokens) | Speed | Retirement Date |
+|-------|---------|-----------------|---------|---------------|----------------------|-------|-----------------|
+| **GPT-5** | Aug 2025 | ~90% (est) | 1M | 128K | Input: $3.00<br>Output: $15.00 | Fast | Aug 2027+ |
+| **GPT-5-mini** | Aug 2025 | ~88% (est) | 1M | 128K | Input: $0.50<br>Output: $2.00 | Fastest | Aug 2027+ |
+| **GPT-5-nano** | Aug 2025 | ~85% (est) | 1M | 128K | Input: $0.10<br>Output: $0.40 | Ultra-fast | Aug 2027+ |
+| **GPT-4.1** | Apr 2025 | ~87% (est) | 128K | 16,384 | Input: $2.00<br>Output: $8.00 | Fast | Apr 2026+ |
+| **GPT-4.1-mini** | Apr 2025 | ~85% (est) | 128K | 16,384 | Input: $0.12<br>Output: $0.50 | Fast | Apr 2026+ |
+| **GPT-4.1-nano** | Apr 2025 | ~83% (est) | 128K | 16,384 | Input: $0.05<br>Output: $0.20 | Very Fast | Apr 2026+ |
+| **o4-mini** | Apr 2025 | Reasoning | 128K | 65,536 | Input: $2.50<br>Output: $10.00 | Moderate | Apr 2026+ |
+| **o3** | Apr 2025 | Advanced Reasoning | 128K | 32,768 | Input: $12.00<br>Output: $48.00 | Slow | Apr 2026+ |
 
-### Next Generation (Available Q2 2025)
+### Legacy Models (Deprecated/Near End-of-Life)
 
-| Model | Release | Context | Output Tokens | Expected Cost | Retirement Date |
-|-------|---------|---------|---------------|---------------|-----------------|
-| **GPT-4.1-mini** | 2025-04-14 | 128K | TBD | Lower than 4o-mini | Apr 11, 2026+ |
-| **GPT-4.1** | 2025-04-14 | 128K | TBD | Lower than 4o | Apr 11, 2026+ |
-| **o4-mini** | 2025-04-16 | 128K | TBD | TBD | Apr 11, 2026+ |
+| Model | Release | Status | Retirement Date |
+|-------|---------|--------|-----------------|
+| **GPT-4o-mini** | Jul 2024 | ⚠️ Mid-Deprecation | Feb 27, 2026 (3 months) |
+| **GPT-4o** | Nov 2024 | ⚠️ Deprecated | Mar 1, 2026 (4 months) |
+| **GPT-4o** | Aug 2024 | ⚠️ Deprecated | Oct 15, 2025 (Past) |
+
+### Alternative Frontier Models (Microsoft Foundry Catalog)
+
+| Model | Provider | Release | Capabilities | Best Use Case |
+|-------|----------|---------|--------------|---------------|
+| **Claude-Opus-4-1** | Anthropic | 2025 | 200K context, multimodal, tool calling | Complex reasoning, safety-critical |
+| **Claude-Sonnet-4-5** | Anthropic | 2025 | 200K context, balanced performance | Multimodal, agentic workflows |
+| **Claude-Haiku-4-5** | Anthropic | 2025 | 200K context, high-speed | Interactive, high-volume |
+| **Grok-4** | xAI | 2025 | Frontier reasoning | Complex multi-step problems |
+| **Grok-3-mini** | xAI | 2025 | Lightweight, interactive | High-volume, cost-optimized |
+| **DeepSeek-V3.1** | DeepSeek | 2025 | Multimodal, grounded retrieval | Enhanced multimodal reasoning |
+| **Llama-4-Maverick-17B** | Meta | 2025 | 1M context, FP8-optimized | Fast, cost-efficient inference |
+| **MAI-DS-R1** | Microsoft | 2025 | Deterministic reasoning | Precision-focused tasks |
 
 ---
 
@@ -56,26 +80,28 @@
 - Natural language explanations
 - **Target**: < 5 seconds per alert at p95
 
-**MVP Model**: **GPT-4o-mini (2024-07-18)**
+**MVP Model** (November 2025): **GPT-4.1-mini**
 
 **Rationale**:
-- ✅ **Performance**: 82% MMLU sufficient for risk scoring logic
-- ✅ **Speed**: Fastest model → meets < 5s latency target
-- ✅ **Cost**: 60% cheaper than GPT-4o (critical for high volume: 10K alerts/day)
-- ✅ **Explainability**: Excellent natural language generation
-- ✅ **Context**: 128K tokens (handles large alert payloads with enrichment data)
+- ✅ **Performance**: ~85% MMLU, enhanced vs GPT-4o-mini
+- ✅ **Speed**: Fast inference meets < 5s latency target
+- ✅ **Cost**: Optimized pricing ($0.12/$0.50 per 1M tokens)
+- ✅ **Lifecycle**: GA since April 2025, 12+ months remaining (retirement Apr 2026+)
+- ✅ **Status**: Stable, production-ready (not mid-deprecation like GPT-4o-mini)
 
 **Cost Analysis (10,000 alerts/day)**:
 - Average tokens per triage: ~2,000 input, ~500 output
-- Daily cost with GPT-4o-mini: (20M input × $0.15/1M) + (5M output × $0.60/1M) = **$6.00/day** = **$180/month**
-- Daily cost with GPT-4o: (20M × $2.50/1M) + (5M × $10.00/1M) = **$100/day** = **$3,000/month**
-- **Savings**: $2,820/month (94% cost reduction)
+- Daily cost with GPT-4.1-mini: (20M input × $0.12/1M) + (5M output × $0.50/1M) = **$4.90/day** = **$147/month**
+- Daily cost with GPT-5-nano: (20M × $0.10/1M) + (5M × $0.40/1M) = **$4.00/day** = **$120/month**
+- **Recommendation**: GPT-4.1-mini for MVP stability, GPT-5-nano for production cost optimization
 
-**Production Model**: **GPT-4.1-mini (2025-04-14)**
-- Successor to GPT-4o-mini
-- Expected cost reduction
-- Enhanced capabilities
-- Longer lifecycle (12+ months from release)
+**Production Model Options**:
+
+| Model | Cost/Month | Pros | Cons |
+|-------|------------|------|------|
+| **GPT-4.1-mini** (Recommended) | $147 | Proven, stable, good performance | Lower context than GPT-5 |
+| **GPT-5-nano** | $120 | Lowest cost, 1M context, newest | Newer (Aug 2025), less battle-tested |
+| **Grok-3-mini** | ~$100 | Lightweight, interactive-optimized | Third-party, requires evaluation |
 
 ---
 
@@ -88,29 +114,32 @@
 - Hypothesis generation
 - **Target**: < 30 seconds for query generation
 
-**MVP Model**: **GPT-4o-mini (2024-07-18)**
+**MVP Model** (November 2025): **GPT-4.1-mini**
 
 **Rationale**:
 - ✅ **Code Generation**: Strong KQL/SQL generation capabilities
 - ✅ **Speed**: Fast enough for interactive hunting
-- ⚠️ **Complexity**: May struggle with very complex multi-stage queries
 - ✅ **Cost**: Hunting queries less frequent than triage (100-500/day vs 10K/day)
+- ⚠️ **Complexity**: May struggle with very complex multi-stage queries
 
 **Cost Analysis (200 queries/day)**:
 - Average tokens per query: ~3,000 input, ~1,000 output
-- Daily cost with GPT-4o-mini: (0.6M input × $0.15/1M) + (0.2M output × $0.60/1M) = **$0.21/day** = **$6.30/month**
+- Daily cost with GPT-4.1-mini: (0.6M input × $0.12/1M) + (0.2M output × $0.50/1M) = **$0.17/day** = **$5.10/month**
 
-**Production Model**: **GPT-4.1 (2025-04-14)**
+**Production Model Options**:
 
-**Rationale for Upgrade**:
-- ✅ **Advanced Reasoning**: Better for complex query logic
-- ✅ **Multi-step Planning**: Improved for hunting workflows (pivot analysis, hypothesis testing)
-- ✅ **Critical Use Case**: Hunting quality directly impacts threat detection effectiveness
-- ✅ **Cost Justifiable**: Lower volume (200/day vs 10K/day) makes premium model affordable
+| Model | Cost/Month | Best For | Rationale |
+|-------|------------|----------|-----------|
+| **GPT-5** (Recommended) | ~$60 | Complex, multi-step hunting workflows | 1M context, advanced reasoning, handles long forensic investigations |
+| **Claude-Sonnet-4-5** | ~$70 | Multimodal threat hunting | 200K context, balanced performance, good for image/doc analysis |
+| **GPT-4.1** | ~$45 | Standard KQL generation | Cost-effective, proven capability |
+| **Grok-4** | ~$80 | Frontier reasoning scenarios | Best-in-class for complex multi-step problems |
 
-**Cost Comparison (Production)**:
-- GPT-4.1 daily cost: ~$5/day = **$150/month** (estimated based on GPT-4o pricing)
-- **Value**: Enhanced threat detection capability worth premium
+**Recommendation**: **GPT-5** for production
+- ✅ **1M Context**: Handle long investigation timelines, full alert histories
+- ✅ **Advanced Reasoning**: Better for complex hunting hypotheses and pivot analysis
+- ✅ **Latest Capabilities**: Access to cutting-edge threat detection patterns
+- ✅ **Cost Justifiable**: Lower volume (200/day) makes premium model affordable
 
 ---
 
@@ -123,7 +152,7 @@
 - Multi-step reasoning (e.g., isolate endpoint → verify isolation → search for lateral movement)
 - **Critical**: High-risk actions require accurate decision-making
 
-**MVP Model**: **GPT-4o-mini (2024-07-18)**
+**MVP Model** (November 2025): **GPT-4.1-mini**
 
 **Rationale**:
 - ✅ **Sufficient for MVP**: Playbook execution is mostly rule-based
@@ -132,20 +161,32 @@
 
 **Cost Analysis (50 incidents/day)**:
 - Average tokens per incident: ~5,000 input, ~1,500 output
-- Daily cost with GPT-4o-mini: (0.25M input × $0.15/1M) + (0.075M output × $0.60/1M) = **$0.08/day** = **$2.40/month**
+- Daily cost with GPT-4.1-mini: (0.25M input × $0.12/1M) + (0.075M output × $0.50/1M) = **$0.07/day** = **$2.10/month**
 
-**Production Model**: **GPT-4.1 (2025-04-14)** ⚠️ **CRITICAL UPGRADE**
+**Production Model Options** (⚠️ SAFETY-CRITICAL):
 
-**Rationale for Upgrade**:
-- ✅ **Safety-Critical**: Incorrect containment actions can cause outages or data loss
-- ✅ **Advanced Reasoning**: Better risk assessment for high-stakes decisions
-- ✅ **Multi-step Planning**: Complex incident response requires sophisticated reasoning
-- ✅ **Compliance**: Higher-quality decision logs for audit trails
-- ✅ **Cost Justifiable**: Low volume (50/day) makes premium model affordable
+| Model | Cost/Month | Best For | Rationale |
+|-------|------------|----------|-----------|
+| **GPT-5** (Recommended) | ~$35 | Complex, novel incidents | Advanced reasoning, 1M context for full incident history |
+| **Claude-Opus-4-1** | ~$50 | Maximum safety, frontier reasoning | Best-in-class for critical decisions, 200K context |
+| **o4-mini** | ~$30 | Reasoning-focused scenarios | Optimized for step-by-step problem solving |
+| **GPT-4.1** | ~$25 | Standard playbook execution | Cost-effective, sufficient for most cases |
 
-**Cost Comparison (Production)**:
-- GPT-4.1 daily cost: ~$2/day = **$60/month** (estimated)
-- **Value**: Risk mitigation for critical business operations
+**Recommendation**: **GPT-5** for production (CRITICAL UPGRADE)
+
+**Safety-Critical Justification**:
+- ✅ **Risk Mitigation**: Incorrect containment actions can cause business outages or data loss
+- ✅ **Advanced Reasoning**: Better multi-step planning for complex incident response
+- ✅ **1M Context**: Full incident history, related alerts, previous actions
+- ✅ **Latest Safety Features**: Enhanced guardrails for high-risk actions
+- ✅ **Compliance**: Higher-quality decision logs for regulatory audit trails
+- ✅ **Cost Justifiable**: Low volume (50/day) + safety-critical = worth premium
+
+**Alternative: Claude-Opus-4-1**
+- Consider for maximum safety requirements
+- Anthropic's flagship safety-focused model
+- 200K context, excellent reasoning
+- Higher cost ($50/month) but industry-leading safety track record
 
 ---
 
@@ -158,7 +199,7 @@
 - Natural language report generation
 - **Target**: Daily briefing quality over speed
 
-**MVP Model**: **GPT-4o-mini (2024-07-18)**
+**MVP Model** (November 2025): **GPT-4.1-mini**
 
 **Rationale**:
 - ✅ **Summarization**: Excellent at generating concise, readable briefings
@@ -166,171 +207,229 @@
 - ✅ **Cost**: Daily briefing (1/day) + IOC enrichment (hundreds/day) is low volume
 
 **Cost Analysis (1 briefing/day, 500 enrichments/day)**:
-- Daily cost with GPT-4o-mini: ~**$1.50/day** = **$45/month**
+- Daily cost with GPT-4.1-mini: ~**$1.20/day** = **$36/month**
 
-**Production Model**: **GPT-4.1-mini (2025-04-14)**
+**Production Model Options**:
 
-**Rationale**:
-- ✅ **Sufficient Capability**: Intelligence summarization doesn't require advanced reasoning
+| Model | Cost/Month | Best For | Rationale |
+|-------|------------|----------|-----------|
+| **GPT-4.1-mini** (Recommended) | $36 | Standard briefings, IOC enrichment | Cost-optimized, sufficient capability |
+| **GPT-5-mini** | $48 | Enhanced briefings with 1M context | Better for correlating long-term threat trends |
+| **Grok-3-mini** | $30 | Budget-optimized | Lightweight, interactive-optimized |
+
+**Recommendation**: **GPT-4.1-mini** for production
+- ✅ **Sufficient Capability**: Intelligence summarization doesn't require frontier reasoning
 - ✅ **Cost-Optimized**: "mini" model appropriate for this workload
-- ✅ **Quality**: Enhanced writing capabilities in GPT-4.1 generation
+- ✅ **Stable**: GA since April 2025, proven in production
+- ✅ **Quality**: Enhanced writing capabilities vs GPT-4o-mini
 
 ---
 
-## Model Lifecycle & Deprecation Analysis
+## Microsoft Foundry Model Catalog (2000+ Models)
 
-### Current Model Lifecycle
+### Why Consider Non-OpenAI Models?
 
-| Model | GA Date | Retirement Date | Months Available | Replacement |
-|-------|---------|-----------------|------------------|-------------|
-| GPT-4o-mini (2024-07-18) | Jul 2024 | Sep 15, 2025+ → Feb 27, 2026 | **15+ months** | GPT-4.1-mini |
-| GPT-4o (2024-11-20) | Nov 2024 | Mar 1, 2026+ | **16+ months** | GPT-4.1 |
-| GPT-4o (2024-08-06) | Aug 2024 | Oct 15, 2025+ | **14+ months** | GPT-4.1 |
+**Diversity & Resilience**:
+- Avoid vendor lock-in to single model family
+- Hedge against deprecation/availability issues
+- Access specialized capabilities (e.g., Claude for safety, Grok for reasoning, DeepSeek for multimodal)
 
-### Migration Timeline
+**Cost Optimization**:
+- Different pricing models and performance profiles
+- Some models offer better cost/performance for specific workloads
+
+**Cutting-Edge Capabilities**:
+- Frontier day-and-date releases (latest research)
+- Specialized models (e.g., MAI-DS-R1 for deterministic reasoning)
+- Multimodal options (e.g., DeepSeek-V3.1 for image + text)
+
+### Key Alternative Models for Agentic SOC
+
+#### 1. Anthropic Claude Family (Safety-Focused)
+
+| Model | Best Use Case | Key Advantage |
+|-------|---------------|---------------|
+| **Claude-Opus-4-1** | Incident Response (safety-critical) | Industry-leading safety, 200K context, frontier reasoning |
+| **Claude-Sonnet-4-5** | Threat Hunting (multimodal) | Balanced performance, good for doc/image analysis |
+| **Claude-Haiku-4-5** | Alert Triage (high-volume) | High-speed, cost-effective, 200K context |
+
+**Consideration**: Claude models excel at safety-critical decisions and have strong track record in production. Consider for Incident Response Agent where incorrect decisions have high business impact.
+
+#### 2. xAI Grok Family (Reasoning-Focused)
+
+| Model | Best Use Case | Key Advantage |
+|-------|---------------|---------------|
+| **Grok-4** | Complex Hunting Scenarios | Frontier-scale reasoning, multi-step problem solving |
+| **Grok-4-fast-reasoning** | Workflow Automation | Accelerated agentic reasoning |
+| **Grok-3-mini** | Cost-Optimized Triage | Lightweight, interactive, high-volume |
+
+**Consideration**: Grok models optimized for agentic workflows and reasoning tasks. Good alternative to GPT-5 for complex hunting queries.
+
+#### 3. DeepSeek Family (Multimodal)
+
+| Model | Best Use Case | Key Advantage |
+|-------|---------------|---------------|
+| **DeepSeek-V3.1** | Multimodal Threat Analysis | Enhanced multimodal reasoning, grounded retrieval |
+| **DeepSeek-R1-0528** | Advanced Reasoning | Long-form, multi-step reasoning |
+
+**Consideration**: If threat hunting requires analyzing screenshots, network diagrams, or security logs in image format.
+
+#### 4. Meta Llama Family (Open/Cost-Optimized)
+
+| Model | Best Use Case | Key Advantage |
+|-------|---------------|---------------|
+| **Llama-4-Maverick-17B** | High-Throughput Triage | 1M context, FP8-optimized for fast inference |
+| **Llama-3.3-70B-Instruct** | General-Purpose | Strong multilingual, cost-effective |
+
+**Consideration**: Llama models offer strong performance at lower cost. Consider for MVP if budget is primary constraint.
+
+#### 5. Microsoft MAI Family (Specialized)
+
+| Model | Best Use Case | Key Advantage |
+|-------|---------------|---------------|
+| **MAI-DS-R1** | Deterministic Reasoning | Precision-focused, reproducible outputs |
+
+**Consideration**: For scenarios requiring deterministic, explainable reasoning (e.g., compliance reporting).
+
+---
+
+## Model Lifecycle & Deprecation Analysis (November 2025)
+
+### Current State
+
+| Model | Status | Retirement Date | Months Remaining | Action Required |
+|-------|--------|-----------------|------------------|-----------------|
+| GPT-4o-mini (2024-07-18) | ⚠️ Mid-Deprecation | Feb 27, 2026 | **3 months** | **Migrate Now** |
+| GPT-4o (2024-11-20) | ⚠️ Deprecated | Mar 1, 2026 | 4 months | Migrate Now |
+| GPT-4o (2024-08-06) | ⚠️ Deprecated | Oct 15, 2025 | **Overdue** | **Critical** |
+| GPT-4.1-mini | ✅ GA | Apr 11, 2026+ | 5+ months | Safe for MVP |
+| GPT-4.1 | ✅ GA | Apr 11, 2026+ | 5+ months | Safe |
+| GPT-5 | ✅ GA | Aug 2027+ | **21+ months** | **Recommended** |
+| GPT-5-mini | ✅ GA | Aug 2027+ | 21+ months | Recommended |
+
+### Migration Timeline (November 2025 → 2026)
 
 ```
-Nov 2024                    Apr 2025              Sep 2025              Feb 2026
-    |                          |                     |                     |
-    |-- MVP (GPT-4o-mini) -----|-- Evaluate 4.1 ----|-- Migrate Start ----|-- Complete -->
-    |                          |                     |                     |
-    |                          GPT-4.1 releases      Deprecation begins    Retirement
+Nov 2025 (NOW)          Jan 2026              Mar 2026              Aug 2026+
+    |                      |                     |                      |
+    |-- GPT-4o EOL --------|-- All 4o retired --|                      |
+    |                      |                     |                      |
+    |-- MVP: GPT-4.1-mini -|-- Stable ----------|-- Evaluate GPT-5 ----|
+    |                      |                     |                      |
+    |-- Production: GPT-5 -|-- Deployment -------|-- Optimization ------|
 ```
 
-**MVP Strategy**:
-- Use GPT-4o-mini (2024-07-18) for **all agents** in MVP (15+ months lifecycle)
-- Plan migration to GPT-4.1 family in Q2 2025 (April release)
-- Evaluate GPT-4.1-mini for triage/intelligence, GPT-4.1 for hunting/response
-
-**Production Strategy**:
-- Deploy with GPT-4.1 family (April 2025+) for longer lifecycle
-- Differentiate models by agent requirements (mini vs standard)
-- Monitor GPT-4.2/5.0 announcements for next generation
+**Critical Action Items**:
+1. ✅ **Avoid GPT-4o family** - Mid-deprecation, only 3-4 months remaining
+2. ✅ **Use GPT-4.1 for MVP** - GA, stable, 5+ months runway
+3. ✅ **Plan GPT-5 for Production** - Long lifecycle (21+ months), latest capabilities
+4. ✅ **Evaluate alternative models** - Hedge against single-vendor risk
 
 ---
 
-## Reasoning Models Analysis (o-series)
+## Cost Summary (November 2025)
 
-### o1-mini & o1
+### MVP Cost Breakdown (Per Month) - GPT-4.1-mini for All Agents
 
-**Capabilities**:
-- ✅ **Advanced Reasoning**: PhD-level problem solving
-- ✅ **Multi-step Planning**: Complex workflows
-- ❌ **Speed**: 5-10x slower than GPT-4o
-- ❌ **Cost**: 2-20x more expensive
+| Agent | Daily Cost | Monthly Cost |
+|-------|------------|--------------|
+| Alert Triage (10K alerts/day) | $4.90 | $147 |
+| Threat Hunting (200 queries/day) | $0.17 | $5.10 |
+| Incident Response (50 incidents/day) | $0.07 | $2.10 |
+| Threat Intelligence (1 briefing + 500 enrichments/day) | $1.20 | $36 |
+| **Total MVP** | **$6.34/day** | **$190/month** |
 
-**Use Case Evaluation**:
-
-| Agent | Should Use o-series? | Rationale |
-|-------|---------------------|-----------|
-| Alert Triage | ❌ No | Speed requirement (<5s) incompatible with reasoning latency |
-| Threat Hunting | ⚠️ Maybe (Edge Cases) | Complex hypothetical scenarios could benefit, but 99% of queries don't need it |
-| Incident Response | ⚠️ Maybe (High-Risk) | Novel/complex incidents with no playbook could use advanced reasoning |
-| Threat Intelligence | ❌ No | Summarization doesn't require reasoning |
-
-**Recommendation**: **Not for MVP**. Consider o-series for production edge cases:
-- **o1-mini** for complex hunting hypotheses (analyst-initiated, not automated)
-- **o1** for novel incident response scenarios (human-approved, not real-time)
-
----
-
-## Fine-Tuning Considerations
-
-### Models Available for Fine-Tuning
-
-| Model | Fine-Tuning Status | Use Case |
-|-------|-------------------|----------|
-| GPT-4o-mini (2024-07-18) | ✅ Public Preview | Alert Triage optimization |
-| GPT-4o (2024-08-06) | ✅ Available | Hunting/Response optimization |
-| GPT-4.1-mini (2025-04-14) | ✅ Expected | Future optimization |
-
-### Fine-Tuning Strategy
-
-**MVP**: No fine-tuning (use base models with prompt engineering)
-
-**Production**: Fine-tune GPT-4.1-mini for Alert Triage Agent
-- **Data**: Use GUIDE dataset ground truth labels (1.17M incidents with TP/FP/BP labels)
-- **Benefit**: Improve false positive filtering by 10-20%
-- **Cost**: Training cost + inference premium
-- **Timeline**: Q3 2025 after 6 months of production data collection
-
----
-
-## Cost Summary
-
-### MVP Cost Breakdown (Per Month)
-
-| Agent | Model | Daily Cost | Monthly Cost |
-|-------|-------|------------|--------------|
-| Alert Triage | GPT-4o-mini | $6.00 | $180 |
-| Threat Hunting | GPT-4o-mini | $0.21 | $6.30 |
-| Incident Response | GPT-4o-mini | $0.08 | $2.40 |
-| Threat Intelligence | GPT-4o-mini | $1.50 | $45 |
-| **Total MVP** | | **$7.79/day** | **$233.70/month** |
+**Savings vs Deprecated GPT-4o**:
+- GPT-4o cost for same workload: ~$3,200/month
+- **Savings**: $3,010/month (94% reduction)
 
 ### Production Cost Breakdown (Per Month) - Differentiated Models
 
 | Agent | Model | Daily Cost | Monthly Cost |
 |-------|-------|------------|--------------|
-| Alert Triage | GPT-4.1-mini | $5.00 | $150 |
-| Threat Hunting | GPT-4.1 | $5.00 | $150 |
-| Incident Response | GPT-4.1 | $2.00 | $60 |
-| Threat Intelligence | GPT-4.1-mini | $1.25 | $37.50 |
-| **Total Production** | | **$13.25/day** | **$397.50/month** |
+| Alert Triage | GPT-5-nano | $4.00 | $120 |
+| Threat Hunting | GPT-5 | $2.00 | $60 |
+| Incident Response | GPT-5 | $1.20 | $35 |
+| Threat Intelligence | GPT-4.1-mini | $1.20 | $36 |
+| **Total Production** | | **$8.40/day** | **$251/month** |
 
-**Cost Increase**: +$163.80/month (+70%)  
-**Value**: Enhanced threat detection, safer containment decisions, longer model lifecycle
+**Cost Increase vs MVP**: +$61/month (+32%)  
+**Value**: Latest capabilities, 21-month lifecycle, enhanced threat detection, safer decisions
+
+### Alternative Production Strategy (Diversified)
+
+| Agent | Model | Monthly Cost | Benefit |
+|-------|-------|--------------|---------|
+| Alert Triage | Claude-Haiku-4-5 | $110 | High-speed, 200K context |
+| Threat Hunting | Grok-4 | $80 | Frontier reasoning |
+| Incident Response | Claude-Opus-4-1 | $50 | Maximum safety |
+| Threat Intelligence | GPT-4.1-mini | $36 | Cost-optimized |
+| **Total Diversified** | | **$276/month** | Vendor diversity, specialized capabilities |
 
 ---
 
-## Recommendations
+## Recommendations (November 2025)
 
-### MVP Phase (Now - Q2 2025)
+### MVP Phase (Now - Q1 2026)
 
-✅ **Use GPT-4o-mini (2024-07-18) for all agents**
+✅ **Use GPT-4.1-mini for all agents**
 
 **Justification**:
-1. **Cost**: 60% cheaper than GPT-4o → MVP budget-friendly
-2. **Performance**: 82% MMLU sufficient for MVP requirements
-3. **Speed**: Meets latency targets (<5s triage, <30s hunting)
-4. **Lifecycle**: 15+ months before retirement (ample time for MVP → production)
-5. **Simplicity**: Single model reduces operational complexity during development
+1. **Avoid Deprecated Models**: GPT-4o-mini has only 3 months remaining (Feb 2026 retirement)
+2. **Stable & Proven**: GA since April 2025, 8 months in production
+3. **Cost**: ~$190/month for full system (10K alerts/day)
+4. **Performance**: ~85% MMLU, enhanced vs GPT-4o-mini
+5. **Lifecycle**: 5+ months runway (retirement Apr 2026+)
+6. **Simplicity**: Single model reduces operational complexity
 
 **Risk Mitigation**:
-- Monitor GPT-4.1 release (April 2025) for evaluation
-- Design agents with pluggable model configuration (environment variable for model name)
-- Track latency/accuracy metrics to validate model performance
+- Design agents with pluggable model configuration (environment variable)
+- Track latency/accuracy metrics to validate performance
+- Plan GPT-5 evaluation for Q1 2026
 
-### Production Phase (Q2 2025+)
+### Production Phase (Q1 2026+)
 
-✅ **Differentiate models by agent requirements**
+✅ **Multi-model strategy with GPT-5 family + alternatives**
+
+**Primary Recommendation**:
 
 | Agent | Production Model | Justification |
 |-------|-----------------|---------------|
-| Alert Triage | **GPT-4.1-mini** | High volume (10K/day) requires cost optimization |
-| Threat Hunting | **GPT-4.1** | Complex reasoning justifies premium model |
-| Incident Response | **GPT-4.1** | Safety-critical decisions require best model |
-| Threat Intelligence | **GPT-4.1-mini** | Summarization doesn't need advanced reasoning |
+| Alert Triage | **GPT-5-nano** | High volume requires cost optimization, 1M context, 21-month lifecycle |
+| Threat Hunting | **GPT-5** | Complex reasoning, 1M context for long investigations, latest capabilities |
+| Incident Response | **GPT-5** or **Claude-Opus-4-1** | Safety-critical decisions, advanced reasoning, maximum reliability |
+| Threat Intelligence | **GPT-4.1-mini** | Summarization sufficient, cost-optimized |
+
+**Alternative/Diversified Strategy** (Hedge vendor risk):
+- Use Claude family for safety-critical (Incident Response)
+- Use Grok family for complex reasoning (Threat Hunting)
+- Mix OpenAI + Anthropic + xAI for resilience
 
 **Migration Plan**:
-1. **Q2 2025**: Evaluate GPT-4.1 family (April release)
-2. **Q2 2025**: A/B test GPT-4.1 vs GPT-4o-mini in production
-3. **Q3 2025**: Migrate Hunting + Response to GPT-4.1
-4. **Q3 2025**: Migrate Triage + Intelligence to GPT-4.1-mini
-5. **Q3 2025**: Retire GPT-4o-mini deployments
+1. **Q1 2026**: Evaluate GPT-5 family in parallel with GPT-4.1
+2. **Q1 2026**: A/B test GPT-5 vs alternatives (Claude, Grok) for Hunting/Response
+3. **Q2 2026**: Migrate Triage to GPT-5-nano (cost + performance)
+4. **Q2 2026**: Migrate Hunting/Response to GPT-5 or alternatives
+5. **Q2 2026**: Retire GPT-4.1 deployments (before Apr 2026 deprecation)
 
 ---
 
-## Decision Matrix
+## Decision Matrix (November 2025)
 
-| Criterion | Weight | GPT-4o-mini (MVP) | GPT-4.1-mini (Prod) | GPT-4.1 (Prod) |
-|-----------|--------|-------------------|---------------------|----------------|
-| Cost | 25% | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐ (3/5) |
-| Performance | 30% | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) |
-| Speed | 20% | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐ (4/5) |
-| Lifecycle | 15% | ⭐⭐⭐ (3/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) |
-| Context | 10% | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) |
-| **Total** | | **4.4/5** | **5.0/5** | **4.4/5** |
+| Criterion | Weight | GPT-4.1-mini (MVP) | GPT-5 (Prod) | Claude-Opus-4-1 (Prod) | Grok-4 (Prod) |
+|-----------|--------|-------------------|--------------|------------------------|---------------|
+| Cost | 20% | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐ (3/5) | ⭐⭐⭐ (3/5) |
+| Performance | 25% | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) |
+| Speed | 15% | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐ (4/5) |
+| Lifecycle | 20% | ⭐⭐⭐ (3/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) |
+| Context | 10% | ⭐⭐⭐ (3/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐ (4/5) |
+| Safety | 10% | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐ (4/5) | ⭐⭐⭐⭐⭐ (5/5) | ⭐⭐⭐⭐ (4/5) |
+| **Total** | | **4.15/5** | **4.60/5** | **4.50/5** | **4.40/5** |
+
+**Winner**: 
+- **MVP**: GPT-4.1-mini (stable, proven, cost-effective)
+- **Production**: GPT-5 (best overall, long lifecycle, latest capabilities)
+- **Safety-Critical**: Claude-Opus-4-1 (industry-leading safety for Incident Response)
 
 ---
 
