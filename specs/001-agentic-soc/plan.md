@@ -17,15 +17,16 @@ The Agentic SOC MVP is an AI-first security operations platform that uses specia
 **Primary Dependencies**: 
 - `azure-ai-projects` (AI Foundry Client SDK)
 - `azure-identity` (Managed Identity / Entra ID authentication)
-- `langchain` / `semantic-kernel` (agent framework support)
+- `agent-framework` (Microsoft Agent Framework - replaces langchain/semantic-kernel)
 - `azure-monitor-opentelemetry` (observability)
 - `pydantic` (data validation and schema management)
 - `pandas` / `polars` (dataset processing)
 - `fastapi` (API endpoints for human approvals/feedback)
+- `azure-search-documents` (Azure AI Search for RAG knowledge base)
 
 **AI Models** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for full analysis):
-- **MVP**: GPT-4o-mini (2024-07-18) for all agents - cost-optimized ($234/month for full system)
-- **Production**: Differentiated - GPT-4.1-mini for high-volume agents (Triage, Intelligence), GPT-4.1 for complex/critical agents (Hunting, Response)
+- **MVP**: GPT-4.1-mini for all agents - cost-optimized ($190/month, avoids deprecated GPT-4o-mini)
+- **Production**: Multi-model - GPT-5-nano for Triage, GPT-5 for Hunting/Response, GPT-4.1-mini for Intelligence ($251/month)
 
 **Storage**: 
 - Microsoft Sentinel incidents (shared context for agents)

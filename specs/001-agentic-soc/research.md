@@ -48,19 +48,22 @@ async def create_triage_agent():
 
 2. **Model Selection** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for comprehensive analysis):
    
-   **MVP Phase** (Cost-Optimized):
-   - **GPT-4o-mini (2024-07-18)**: All agents (reasoning, explanations, risk scoring)
-     - 60% cheaper than GPT-4o, 82% MMLU score, fastest in GPT-4 family
-     - Lifecycle: 15+ months (retirement Sep 2025 → Feb 2026)
-     - Cost: ~$234/month for 10K alerts/day + hunting + response + intelligence
+   **MVP Phase** (November 2025 - Stable, GA Models):
+   - **GPT-4.1-mini**: All agents (reasoning, explanations, risk scoring)
+     - Avoids deprecated GPT-4o-mini (retirement Feb 2026 - only 3 months away)
+     - ~85% MMLU, GA since April 2025, 5+ months lifecycle remaining
+     - Cost: ~$190/month for 10K alerts/day + hunting + response + intelligence
    - **text-embedding-3-large**: Alert similarity, threat intelligence matching
    
-   **Production Phase** (Performance-Optimized):
-   - **GPT-4.1-mini** (Apr 2025): Alert Triage + Threat Intelligence (high volume, cost-sensitive)
-   - **GPT-4.1** (Apr 2025): Threat Hunting + Incident Response (complex reasoning, safety-critical)
-   - **Migration Timeline**: Q2 2025 evaluation → Q3 2025 production deployment
+   **Production Phase** (Performance-Optimized, Leveraging GPT-5 Family):
+   - **GPT-5-nano**: Alert Triage (high volume, 272K context, $120/month)
+   - **GPT-5**: Threat Hunting (complex reasoning, 1M context, $60/month)
+   - **GPT-5 or Claude-Opus-4-1**: Incident Response (safety-critical, frontier reasoning, $35-50/month)
+   - **GPT-4.1-mini**: Threat Intelligence (summarization, cost-optimized, $36/month)
+   - **Total**: $251/month (GPT-5 strategy) or $276/month (diversified with Claude/Grok)
+   - **Migration Timeline**: Q1 2026 evaluation → Q2 2026 production deployment
    
-   **Rationale**: GPT-4o-mini provides excellent cost/performance for MVP. Production differentiates models by agent requirements: high-volume agents (triage) use cost-optimized mini models, while complex/critical agents (hunting, response) use advanced reasoning models. GPT-4.1 family offers longer lifecycle and enhanced capabilities.
+   **Rationale**: GPT-4.1-mini avoids deprecated GPT-4o family (mid-deprecation, Feb 2026 retirement). Production leverages GPT-5 family (released Aug 2025) with 21-month lifecycle, 272K context, and advanced reasoning. Diversified strategy includes alternatives from Microsoft Foundry catalog (Claude, Grok, DeepSeek, Llama) to hedge vendor risk.
 
 3. **Deployment Model**:
    - **Azure Container Apps**: Host agent application code (FastAPI backend, orchestration logic)
@@ -627,6 +630,172 @@ traces
 
 ---
 
+## 8. Azure AI Search for Knowledge Base (RAG Pattern)
+
+### Decision: Use Azure AI Search with Agentic Retrieval for Agent Knowledge
+
+**Rationale**: Agents need access to contextual knowledge beyond their training data:
+- **Attack Dataset + Runbooks**: 14K attack scenarios with MITRE-mapped tactics, response playbooks
+- **Historical Incident Patterns**: Query GUIDE dataset (1.17M incidents) for similar past incidents
+- **Threat Intelligence**: IOC databases, vulnerability information, threat actor profiles
+- **SOC Documentation**: Internal runbooks, escalation procedures, analyst notes
+
+**Why Azure AI Search**:
+- **Agentic Retrieval** (preview): Purpose-built for AI agents with intelligent query decomposition
+- **Hybrid Search**: Combines vector similarity + keyword matching for best relevance
+- **Integration**: Native integration with Azure AI Foundry Agent Framework
+- **Performance**: Sub-second retrieval latency, scales to millions of documents
+- **Security**: Integrated with Azure Entra ID, supports document-level security
+
+**Implementation** (Agent Framework Integration):
+
+```python
+from azure.search.documents.agent import KnowledgeAgentRetrievalClient
+from azure.search.documents.agent.models import (
+    KnowledgeAgentRetrievalRequest,
+    KnowledgeAgentMessage,
+    KnowledgeAgentMessageTextContent,
+    SearchIndexKnowledgeSourceParams
+)
+from agent_framework import ChatAgent, ChatMessage, Role
+from agent_framework.azure import AzureOpenAIChatClient
+
+# Initialize knowledge agent client
+knowledge_client = KnowledgeAgentRetrievalClient(
+    endpoint=search_endpoint,
+    agent_name="soc-knowledge-agent",
+    credential=credential
+)
+
+# Agent uses natural language to query knowledge base
+async def enrich_alert_with_knowledge(alert: SecurityAlert):
+    """
+    Alert Triage Agent queries knowledge base for context:
+    - Similar past incidents
+    - Known attack patterns matching alert indicators
+    - Threat intelligence on entities (IPs, domains, hashes)
+    """
+    
+    # Construct contextual query
+    query = f"""
+    Alert: {alert.AlertName}
+    Entities: {', '.join([e.Properties.get('Address', e.Properties.get('Name', '')) for e in alert.Entities])}
+    MITRE Techniques: {', '.join(alert.ExtendedProperties.get('MitreTechniques', []))}
+    
+    Find:
+    1. Similar historical incidents with outcomes
+    2. Known attack scenarios matching these indicators
+    3. Threat intelligence on observed entities
+    """
+    
+    # Agentic retrieval - automatically decomposes query into focused sub-queries
+    retrieval_request = KnowledgeAgentRetrievalRequest(
+        messages=[
+            KnowledgeAgentMessage(
+                role="user",
+                content=[KnowledgeAgentMessageTextContent(text=query)]
+            )
+        ],
+        knowledge_source_params=[
+            SearchIndexKnowledgeSourceParams(
+                knowledge_source_name="attack-scenarios",
+                kind="searchIndex"
+            ),
+            SearchIndexKnowledgeSourceParams(
+                knowledge_source_name="historical-incidents",
+                kind="searchIndex"
+            ),
+            SearchIndexKnowledgeSourceParams(
+                knowledge_source_name="threat-intelligence",
+                kind="searchIndex"
+            )
+        ]
+    )
+    
+    result = knowledge_client.retrieve(retrieval_request=retrieval_request)
+    
+    # Extract grounding data from retrieval response
+    enrichment_data = {
+        "similar_incidents": extract_incidents(result),
+        "matched_attack_scenarios": extract_scenarios(result),
+        "threat_intel_matches": extract_threat_intel(result),
+        "response_playbooks": extract_playbooks(result)
+    }
+    
+    return enrichment_data
+
+# Alert Triage Agent with knowledge retrieval tool
+async def create_triage_agent_with_knowledge():
+    chat_client = AzureOpenAIChatClient()
+    
+    async def query_knowledge_base(query: str) -> str:
+        """Tool for agent to query knowledge base"""
+        result = await knowledge_client.retrieve(
+            KnowledgeAgentRetrievalRequest(
+                messages=[KnowledgeAgentMessage(
+                    role="user",
+                    content=[KnowledgeAgentMessageTextContent(text=query)]
+                )],
+                knowledge_source_params=[
+                    SearchIndexKnowledgeSourceParams(
+                        knowledge_source_name="attack-scenarios",
+                        kind="searchIndex"
+                    )
+                ]
+            )
+        )
+        return format_knowledge_results(result)
+    
+    agent = ChatAgent(
+        name="AlertTriageAgent",
+        chat_client=chat_client,
+        instructions="""
+        You are an expert SOC analyst specializing in alert triage.
+        
+        When analyzing alerts:
+        1. Use query_knowledge_base to find similar past incidents
+        2. Look up attack scenarios matching MITRE techniques
+        3. Check threat intelligence for entity reputation
+        4. Reference response playbooks for known patterns
+        
+        Provide risk score (0-100), triage decision, and explanation.
+        """,
+        tools=[query_knowledge_base]
+    )
+    
+    return agent
+```
+
+**Knowledge Base Structure** (3 search indexes):
+
+```python
+# Index 1: Attack Scenarios & Response Playbooks (14K scenarios from Attack dataset)
+# Index 2: Historical Incidents (10K curated incidents from GUIDE dataset)
+# Index 3: Threat Intelligence & IOCs (50K indicators, refreshed weekly)
+```
+
+**Performance Targets**:
+- **Retrieval Latency**: < 500ms p95 (parallel sub-queries)
+- **Relevance**: Top-3 results @ 85%+ precision (hybrid + semantic ranking)
+- **Index Size**: ~75K documents total across 3 indexes
+
+**Cost Estimation** (MVP):
+- **Azure AI Search Standard S1**: ~$250/month (50GB storage, 100K docs, 3 indexes)
+- **OpenAI Embeddings**: ~$20/month (one-time indexing + incremental updates)
+
+**Alternatives Considered**:
+- **Agent in-context only**: Insufficient for 14K attack scenarios. Rejected - context window limits.
+- **Cosmos DB vector search**: Less mature, no agentic retrieval. Deferred to evaluation phase.
+- **Fabric OneLake**: Not optimized for real-time retrieval. Better for batch analytics.
+- **No knowledge base**: Agents would lack context. Poor triage quality. Rejected.
+
+**References**:
+- [Azure AI Search Agentic Retrieval](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-overview)
+- [RAG Pattern with Azure AI Search](https://learn.microsoft.com/en-us/azure/search/retrieval-augmented-generation-overview)
+- [Agent Framework Knowledge Retrieval](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/knowledge-retrieval)
+
+---
+
 ## Summary of Decisions
 
 | Area | Decision | Rationale |
@@ -637,6 +806,7 @@ traces
 | **Query Language** | KQL with LLM-powered generation | Industry standard for Sentinel/Defender, powerful analytics |
 | **Mock Data** | GUIDE + Attack datasets, configurable streaming | Real-world data quality, reproducible demos, ground truth labels |
 | **Threat Intelligence** | Multi-tier (MITRE, Attack dataset, historical) | Comprehensive coverage, tactical + operational intelligence |
+| **Knowledge Base** | Azure AI Search with Agentic Retrieval | RAG pattern for agent context, 14K attack scenarios + 10K historical incidents |
 | **Observability** | Azure Monitor + Application Insights + OpenTelemetry | Unified platform, distributed tracing, production-ready |
 
 ---

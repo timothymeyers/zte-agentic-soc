@@ -15,10 +15,12 @@
 
 **Key Decisions Made**:
 
-1. **AI Platform**: Azure AI Foundry with Python SDK
+1. **AI Platform**: Azure AI Foundry with Python SDK + Microsoft Agent Framework
    - Persistent agents with managed state
-   - **MVP**: GPT-4o-mini (2024-07-18) for all agents (cost-optimized: $234/month)
-   - **Production**: GPT-4.1-mini for Triage/Intelligence, GPT-4.1 for Hunting/Response (performance-optimized)
+   - **MVP**: GPT-4.1-mini for all agents (cost-optimized: $190/month, avoids deprecated GPT-4o-mini)
+   - **Production**: Multi-model strategy leveraging GPT-5 family + Foundry catalog (2000+ models)
+     - GPT-5-nano for Triage ($120/mo), GPT-5 for Hunting/Response ($60-35/mo), GPT-4.1-mini for Intelligence ($36/mo)
+     - Alternative frontier models: Claude (Opus-4-1, Sonnet-4-5), Grok-4, DeepSeek-V3.1, Llama-4-Maverick, MAI-DS-R1
    - text-embedding-3-large for similarity/matching
    - **See**: [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for comprehensive analysis
 

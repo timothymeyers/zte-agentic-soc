@@ -8,6 +8,99 @@ This document defines the core entities, data models, and schemas for the Agenti
 
 ---
 
+## Data Model Strategy: SDK Alignment & Custom Extensions
+
+### Relationship to Microsoft SDKs and Frameworks
+
+**Q: Are these data structures provided by the SDKs/frameworks we're using?**
+
+**A: Partial overlap with intentional custom extensions**
+
+#### 1. SecurityAlert & SecurityIncident (SDK-Provided)
+
+**Source**: Microsoft Sentinel / Defender XDR APIs
+- ✅ **SecurityAlert**: Schema matches [Microsoft Sentinel SecurityAlert table](https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-schemas)
+- ✅ **SecurityIncident**: Schema matches [Microsoft Sentinel SecurityIncident table](https://learn.microsoft.com/en-us/azure/sentinel/manage-soc-with-incident-metrics#securityincidents-schema)
+
+**Rationale for Pydantic Models**:
+- SDK returns JSON/dict → We add **type safety** with Pydantic validation
+- Sentinel API uses camelCase → We maintain compatibility but add **validation rules**
+- **No SDK provides Pydantic models** → We create them for type-safe agent code
+
+```python
+# WITHOUT Pydantic (SDK raw response)
+alert = sentinel_client.get_alert(alert_id)  # Returns dict
+# Risk: No type checking, easy to miss fields
+
+# WITH Pydantic (our models)
+alert = SecurityAlert(**sentinel_client.get_alert(alert_id))  # Validated
+# Benefit: IDE autocomplete, runtime validation, serialization
+```
+
+#### 2. Agent-Specific Entities (Custom, Not in SDKs)
+
+These entities are **unique to our agentic architecture** and **not provided by any SDK**:
+
+| Entity | SDK Provided? | Rationale for Custom Model |
+|--------|---------------|----------------------------|
+| **TriageResult** | ❌ No | Agent output schema - risk scores, decisions, explanations. Sentinel has no concept of "AI triage result". |
+| **HuntingQuery** | ❌ No | Natural language → KQL workflow. Sentinel API accepts KQL strings, not natural language queries. |
+| **ResponseAction** | ❌ No | Containment actions with risk-based approval. Defender has "remediation actions" but not our human-in-loop approval workflow. |
+| **ThreatBriefing** | ❌ No | AI-generated daily intelligence briefing. No SDK provides this. |
+| **AgentState** | ❌ No | Persistent agent execution state. Microsoft Agent Framework has session state, but not our domain-specific metrics. |
+| **AuditLog** | ❌ No | Immutable compliance trail for agent actions. Sentinel has audit logs for human actions, not AI agent actions. |
+
+#### 3. Microsoft Agent Framework Integration
+
+**Agent Framework Provides**:
+- `ChatMessage`, `ChatAgent`, `Role` - Conversation primitives
+- `AFBaseModel` - Pydantic-compatible base for serialization
+- `AgentRunContext`, `AgentMiddleware` - Execution pipeline
+
+**We Extend With**:
+```python
+from agent_framework import ChatAgent, ChatMessage, Role
+from agent_framework._pydantic import AFBaseModel  # Pydantic compatibility
+
+# Our domain model extends AF primitives
+class TriageResult(AFBaseModel):  # Uses Agent Framework's Pydantic base
+    triageId: UUID4
+    alertId: UUID4
+    riskScore: int  # 0-100
+    priority: PriorityLevel
+    triageDecision: TriageDecision
+    explanation: str
+    # ... agent-specific fields not in any SDK
+```
+
+**Why Not Use SDK Models Directly?**:
+1. **Sentinel SDK** (azure-mgmt-securityinsight): Management plane only, no data models
+2. **Defender SDK** (microsoft-graph): Returns generic dicts/JSON, no Pydantic models
+3. **Agent Framework**: Provides conversation primitives, not security domain models
+
+#### 4. Cosmos DB Schema
+
+**SDK**: `azure-cosmos` provides CRUD operations, **not** schema definitions
+
+**Our Approach**:
+- Define Pydantic models → Serialize to JSON → Store in Cosmos DB
+- Cosmos DB is schemaless (NoSQL) → Our Pydantic models enforce schema at application layer
+- Partitioning strategy (`/Severity`, `/AgentName`) is custom, not SDK-provided
+
+```python
+from azure.cosmos import CosmosClient
+
+# SDK provides client, not schema
+cosmos_client = CosmosClient(endpoint, credential)
+container = cosmos_client.get_database_client("agentic-soc").get_container_client("alerts")
+
+# Our Pydantic model enforces schema
+alert = SecurityAlert(**raw_alert_data)  # Validates against our schema
+container.create_item(alert.model_dump())  # Serialize to JSON for Cosmos
+```
+
+---
+
 ## 1. Core Entity: SecurityAlert
 
 **Purpose**: Represents a security alert from any source (Sentinel, Defender, mock data stream)

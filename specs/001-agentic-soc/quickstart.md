@@ -69,7 +69,7 @@ Create `.env` file in project root:
 ```bash
 # Azure AI Foundry
 AZURE_AI_PROJECT_ENDPOINT="https://<your-project>.services.ai.azure.com/api/projects/<project-id>"
-AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"  # MVP: GPT-4.1-mini | Production: gpt-5-nano for triage, gpt-5 for hunting/response
 
 # Azure Cosmos DB
 COSMOS_DB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
