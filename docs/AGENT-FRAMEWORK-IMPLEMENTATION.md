@@ -58,7 +58,7 @@ The Alert Triage Agent has been completely refactored to use the **Microsoft Age
 │                                                              │
 │  • AzureAIAgentClient (when endpoint configured)            │
 │  • OpenAIChatClient (fallback for local testing)            │
-│  • Model: GPT-4.1-mini-mini or other deployed model               │
+│  • Model: GPT-4.1-mini or other deployed model               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -76,26 +76,12 @@ The Alert Triage Agent has been completely refactored to use the **Microsoft Age
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Key Improvements
+## Implementation Details
 
 ### 1. **Microsoft Agent Framework Integration**
 
-**Before (Custom Implementation):**
-```python
-class AlertTriageAgent:
-    def __init__(self):
-        # Custom agent implementation
-        self.agent_version = "0.1.0"
-    
-    async def triage_alert(self, alert):
-        # Manual implementation of all logic
-        risk_score = self._calculate_risk_score(alert)
-        correlated = self._correlate_alerts(alert)
-        decision = self._make_decision(risk_score, correlated)
-        # ...
-```
+The Alert Triage Agent is built using the Microsoft Agent Framework with proper `ChatAgent` orchestration:
 
-**After (Agent Framework):**
 ```python
 from agent_framework import ChatAgent, ai_function
 from agent_framework.azure import AzureAIAgentClient
@@ -214,13 +200,14 @@ az login
 ### Run the Demo
 
 ```bash
-# With Azure AI Foundry (recommended)
-python utils/demo_agent_framework.py
-
-# Without Azure AI Foundry (uses OpenAI fallback)
-# Just run without setting environment variables
+# Requires Azure AI Foundry endpoint configuration
+export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/api/projects/project-id"
+export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
+az login
 python utils/demo_agent_framework.py
 ```
+
+**Note**: Local testing without Azure requires Ollama integration (planned enhancement).
 
 ### Programmatic Usage
 
@@ -338,7 +325,7 @@ await agent.close()
 | **Decision Making** | Hardcoded logic | AI-powered reasoning |
 | **Explanations** | Template strings | Natural language generation |
 | **Extensibility** | Requires code changes | Add new @ai_function tools |
-| **Testing** | Mock all components | Use OpenAI fallback |
+| **Testing** | Mock all components | Azure AI Foundry required |
 | **Enterprise Ready** | Basic | Azure AD auth, managed deployments |
 
 ## Benefits of New Implementation
@@ -347,7 +334,7 @@ await agent.close()
 2. **Framework Best Practices**: Using Microsoft's official patterns
 3. **Natural Language**: AI generates human-readable explanations
 4. **Extensible**: Easy to add new tools without changing core logic
-5. **Testable**: Can run with OpenAI fallback without Azure
+5. **Azure Integration**: Proper Azure AI Foundry with security and monitoring
 6. **Enterprise Ready**: Proper Azure integration with security and monitoring
 7. **Future-Proof**: Compatible with Microsoft's agent ecosystem
 

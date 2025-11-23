@@ -36,11 +36,14 @@ async def demo_agent_framework():
     model_deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
     
     if not project_endpoint:
-        logger.warning("\n⚠️  AZURE_AI_PROJECT_ENDPOINT not set!")
-        logger.warning("The agent will run in fallback mode with OpenAI.")
-        logger.warning("For full Azure AI Foundry integration, set:")
-        logger.warning("  export AZURE_AI_PROJECT_ENDPOINT='https://your-project.services.ai.azure.com/api/projects/project-id'")
-        logger.warning("  export AZURE_AI_MODEL_DEPLOYMENT_NAME='gpt-4.1-mini'\n")
+        logger.error("\n❌ AZURE_AI_PROJECT_ENDPOINT not set!")
+        logger.error("Azure AI Foundry endpoint is required for the agent to function.")
+        logger.error("Local LLM support (Ollama) is planned but not yet implemented.")
+        logger.error("\nTo run this demo, configure Azure AI Foundry:")
+        logger.error("  export AZURE_AI_PROJECT_ENDPOINT='https://your-project.services.ai.azure.com/api/projects/project-id'")
+        logger.error("  export AZURE_AI_MODEL_DEPLOYMENT_NAME='gpt-4.1-mini'\n")
+        logger.error("See README.md for setup instructions.")
+        return
     else:
         logger.info(f"\n✓ Using Azure AI Foundry")
         logger.info(f"  Project: {project_endpoint}")

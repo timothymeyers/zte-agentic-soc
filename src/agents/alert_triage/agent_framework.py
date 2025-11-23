@@ -331,19 +331,12 @@ When triaging an alert:
                     ]
                 )
             else:
-                # Use OpenAI client for local testing (fallback)
-                logger.warning("No Azure AI Foundry endpoint configured, using OpenAI client")
-                from agent_framework.openai import OpenAIChatClient
-                
-                self._agent = ChatAgent(
-                    chat_client=OpenAIChatClient(),
-                    instructions=instructions,
-                    tools=[
-                        self.tools.calculate_risk_score,
-                        self.tools.find_correlated_alerts,
-                        self.tools.make_triage_decision,
-                        self.tools.get_mitre_context
-                    ]
+                # TODO: Add Ollama support for local testing without Azure
+                # For now, return NotImplementedError to indicate local LLM support needed
+                logger.error("No Azure AI Foundry endpoint configured. Local testing requires Ollama integration (coming soon).")
+                raise NotImplementedError(
+                    "Local LLM support not yet implemented. Please configure AZURE_AI_PROJECT_ENDPOINT "
+                    "or add Ollama integration for local testing. See README.md for details."
                 )
         
         return self._agent

@@ -119,12 +119,17 @@ az login
 python utils/demo_agent_framework.py
 ```
 
-#### Option 2: Without Azure (OpenAI Fallback)
+#### Option 2: Without Azure (Local Testing)
+
+For local testing without Azure AI Foundry, you'll need to configure an alternative LLM:
 
 ```bash
-# No configuration needed - automatically uses OpenAI fallback
+# TODO: Ollama integration for local testing
+# Currently returns NotImplementedError - local LLM support coming soon
 python utils/demo_agent_framework.py
 ```
+
+**Note**: The OpenAI fallback has been removed. Local testing will require Ollama or another local LLM provider (planned enhancement).
 
 ### What You'll See
 
