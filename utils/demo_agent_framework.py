@@ -33,14 +33,14 @@ async def demo_agent_framework():
     
     # Check for required environment variables
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-    model_deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o-mini")
+    model_deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
     
     if not project_endpoint:
         logger.warning("\n⚠️  AZURE_AI_PROJECT_ENDPOINT not set!")
         logger.warning("The agent will run in fallback mode with OpenAI.")
         logger.warning("For full Azure AI Foundry integration, set:")
         logger.warning("  export AZURE_AI_PROJECT_ENDPOINT='https://your-project.services.ai.azure.com/api/projects/project-id'")
-        logger.warning("  export AZURE_AI_MODEL_DEPLOYMENT_NAME='gpt-4o-mini'\n")
+        logger.warning("  export AZURE_AI_MODEL_DEPLOYMENT_NAME='gpt-4.1-mini'\n")
     else:
         logger.info(f"\n✓ Using Azure AI Foundry")
         logger.info(f"  Project: {project_endpoint}")
@@ -127,7 +127,7 @@ async def demo_agent_framework():
     logger.info("    ├─ make_triage_decision")
     logger.info("    └─ get_mitre_context")
     logger.info("    ↓")
-    logger.info("  AI Model (GPT-4o via Azure AI Foundry)")
+    logger.info("  AI Model (GPT-4.1-mini via Azure AI Foundry)")
     logger.info("    ↓")
     logger.info("  Structured Output (TriageResult)")
     logger.info("")

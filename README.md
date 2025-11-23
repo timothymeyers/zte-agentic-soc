@@ -110,7 +110,7 @@ The Alert Triage Agent is implemented using **Microsoft Agent Framework** and ca
 ```bash
 # Set up Azure AI Foundry project endpoint
 export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/api/projects/project-id"
-export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
 
 # Authenticate with Azure
 az login
@@ -140,7 +140,7 @@ The demo showcases:
 ### Architecture
 
 ```
-GUIDE Dataset → Alert → ChatAgent (Framework) → AI Function Tools → GPT-4o → Triage Decision
+GUIDE Dataset → Alert → ChatAgent (Framework) → AI Function Tools → GPT-4.1-mini → Triage Decision
                                                     ↓
                                     - calculate_risk_score
                                     - find_correlated_alerts

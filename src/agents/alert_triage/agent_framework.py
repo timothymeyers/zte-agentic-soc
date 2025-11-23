@@ -266,7 +266,7 @@ class AlertTriageAgent:
         self.agent_version = agent_version
         self.agent_name = "AlertTriageAgent"
         self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-        self.model_deployment_name = model_deployment_name or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o-mini")
+        self.model_deployment_name = model_deployment_name or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
         
         # Initialize tools
         self.tools = AlertTriageTools()

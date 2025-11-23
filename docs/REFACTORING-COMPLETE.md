@@ -103,7 +103,7 @@ class AlertTriageAgent:
 | **SDK** | None | azure-ai-projects ✅ |
 | **Client** | N/A | AzureAIAgentClient ✅ |
 | **Tools** | Private methods | @ai_function decorators ✅ |
-| **AI** | None (hardcoded rules) | GPT-4o via Azure AI ✅ |
+| **AI** | None (hardcoded rules) | GPT-4.1-mini via Azure AI ✅ |
 | **Decisions** | if/else statements | AI-powered reasoning ✅ |
 | **Explanations** | String templates | Natural language generation ✅ |
 | **Type Safety** | Basic | Annotated with Field ✅ |
@@ -140,7 +140,7 @@ python utils/demo_agent_framework.py
 ### Production (With Azure AI Foundry)
 ```bash
 export AZURE_AI_PROJECT_ENDPOINT="https://..."
-export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
 az login
 python utils/demo_agent_framework.py
 ```
@@ -203,7 +203,7 @@ deprecated: utils/demo_alert_triage.py
 - [X] Async/await throughout
 
 ### AI Integration ✅
-- [X] GPT-4o via Azure AI Foundry
+- [X] GPT-4.1-mini via Azure AI Foundry
 - [X] Natural language instructions
 - [X] AI-generated explanations
 - [X] Tool orchestration by AI

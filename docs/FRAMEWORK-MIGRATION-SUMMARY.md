@@ -122,7 +122,7 @@ self._project_client = AIProjectClient(
 agent = ChatAgent(
     chat_client=AzureAIAgentClient(
         project_client=self._project_client,
-        model_deployment_name="gpt-4o-mini"
+        model_deployment_name="gpt-4.1-mini"
     ),
     tools=[...]
 )
@@ -185,11 +185,11 @@ agent = ChatAgent(
 
 ### For Production (With Azure AI Foundry)
 1. Set up Azure AI Foundry project
-2. Deploy GPT-4o-mini model
+2. Deploy GPT-4.1-mini model
 3. Set environment variables:
    ```bash
    export AZURE_AI_PROJECT_ENDPOINT="https://..."
-   export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+   export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
    ```
 4. Authenticate: `az login`
 5. Run: `python utils/demo_agent_framework.py`

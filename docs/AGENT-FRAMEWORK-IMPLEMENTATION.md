@@ -58,7 +58,7 @@ The Alert Triage Agent has been completely refactored to use the **Microsoft Age
 │                                                              │
 │  • AzureAIAgentClient (when endpoint configured)            │
 │  • OpenAIChatClient (fallback for local testing)            │
-│  • Model: GPT-4o-mini or other deployed model               │
+│  • Model: GPT-4.1-mini-mini or other deployed model               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -205,7 +205,7 @@ Always use the provided tools to analyze alerts systematically."""
 ```bash
 # Required for Azure AI Foundry integration
 export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/api/projects/project-id"
-export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
 
 # Authenticate with Azure
 az login
@@ -231,7 +231,7 @@ from src.shared.schemas import SecurityAlert
 # Initialize agent
 agent = get_triage_agent(
     project_endpoint="https://...",
-    model_deployment_name="gpt-4o-mini"
+    model_deployment_name="gpt-4.1-mini"
 )
 
 # Triage an alert
@@ -333,7 +333,7 @@ await agent.close()
 | Aspect | Before (Custom) | After (Agent Framework) |
 |--------|----------------|------------------------|
 | **Architecture** | Custom implementation | Microsoft Agent Framework |
-| **AI Integration** | None (rule-based) | GPT-4o via Azure AI Foundry |
+| **AI Integration** | None (rule-based) | GPT-4.1-mini via Azure AI Foundry |
 | **Tool Pattern** | Manual methods | @ai_function decorators |
 | **Decision Making** | Hardcoded logic | AI-powered reasoning |
 | **Explanations** | Template strings | Natural language generation |
