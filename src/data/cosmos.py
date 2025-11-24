@@ -10,10 +10,9 @@ from uuid import UUID
 
 from azure.cosmos.aio import CosmosClient as AsyncCosmosClient
 from azure.cosmos import PartitionKey, exceptions
-from azure.core.credentials import AzureKeyCredential
+from azure.identity import DefaultAzureCredential
 
 from src.shared.logging import get_logger
-from src.shared.auth import get_credential
 
 
 logger = get_logger(__name__)
@@ -39,11 +38,11 @@ class CosmosDBClient:
         self.endpoint = endpoint
         self.database_name = database_name
         
-        # Use key if provided, otherwise use Managed Identity
+        # Use key if provided (as string), otherwise use DefaultAzureCredential
         if key:
-            credential = AzureKeyCredential(key)
+            credential = key  # Cosmos DB accepts the key as a string directly
         else:
-            credential = get_credential()
+            credential = DefaultAzureCredential()
         
         self.client = AsyncCosmosClient(endpoint, credential)
         self.database = None
