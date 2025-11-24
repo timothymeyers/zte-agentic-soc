@@ -40,11 +40,11 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-11-15' = {
     enableAutomaticFailover: environment == 'prod'
     enableMultipleWriteLocations: false
     publicNetworkAccess: 'Enabled' // Change to 'Disabled' for private endpoints
-    capabilities: [
+    capabilities: environment == 'dev' ? [
       {
-        name: 'EnableServerless' // Use serverless for dev, provisioned for prod
+        name: 'EnableServerless' // Use serverless for dev only
       }
-    ]
+    ] : []
   }
 }
 

@@ -15,6 +15,7 @@ param tags object = {}
 
 var workspaceName = '${baseName}-ai-foundry-${environment}'
 var modelDeploymentName = 'gpt-4.1-mini'
+var modelDeploymentResourceName = '${workspaceName}/deployment-${modelDeploymentName}'
 
 // AI Foundry workspace (Hub)
 resource aiFoundryWorkspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
@@ -33,24 +34,10 @@ resource aiFoundryWorkspace 'Microsoft.MachineLearningServices/workspaces@2024-0
 }
 
 // Model deployment: GPT-4.1-mini
-resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  name: '${workspaceName}/${modelDeploymentName}'
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4.1-mini'
-      version: '2024-07-18' // Latest version as of plan creation
-    }
-    raiPolicyName: 'Microsoft.Default'
-  }
-  sku: {
-    name: 'Standard'
-    capacity: 100 // TPM (Tokens Per Minute)
-  }
-  dependsOn: [
-    aiFoundryWorkspace
-  ]
-}
+// Note: Model deployments for AI Foundry workspaces are created via the AI Projects SDK
+// or Azure Portal after workspace provisioning. This is a reference placeholder.
+// Use Azure AI Projects SDK to create model deployments programmatically:
+// https://learn.microsoft.com/azure/ai-studio/how-to/deploy-models-openai
 
 // Output values for other modules
 output workspaceId string = aiFoundryWorkspace.id
