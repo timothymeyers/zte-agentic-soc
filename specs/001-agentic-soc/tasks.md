@@ -62,20 +62,20 @@
 
 **Why Early**: Infrastructure services (Cosmos DB, Event Hubs, AI Foundry, Application Insights) must be deployed before User Story testing can begin. Moving this phase earlier enables parallel development and testing.
 
-- [ ] T024 Create main Bicep template in infra/main.bicep with parameters for environment, location, resource naming (PLACEHOLDER CREATED - needs full implementation)
-- [ ] T025 [P] Create AI Foundry module in infra/modules/ai-foundry.bicep with workspace, model deployments (gpt-4.1-mini, text-embedding-3-large) (TODO)
-- [ ] T026 [P] Create Cosmos DB module in infra/modules/cosmos.bicep with database, collections, partition keys, TTL settings per data-model.md (TODO)
-- [ ] T027 [P] Create Event Hubs module in infra/modules/event-hubs.bicep with namespace, alert-ingestion hub, consumer groups (TODO)
-- [ ] T028 [P] Create Container Apps module in infra/modules/container-apps.bicep with environment, agent services, orchestrator service, API service (TODO)
-- [ ] T029 [P] Create Application Insights module in infra/modules/monitoring.bicep with workspace, Log Analytics, dashboards (TODO)
-- [ ] T030 [P] Create Azure AI Search module in infra/modules/ai-search.bicep with Standard S1 tier, 3 indexes (attack-scenarios, historical-incidents, threat-intelligence) (TODO - utils/setup_ai_search.py created as utility)
-- [ ] T031 Create parameter files in infra/parameters/: dev.parameters.json, prod.parameters.json with environment-specific settings (dev.parameters.json PLACEHOLDER CREATED)
-- [ ] T032 [P] Create deployment script in utils/deploy_infrastructure.sh using az deployment group create with Bicep templates (TODO)
-- [ ] T033 Deploy infrastructure to dev environment and verify all services are accessible (TODO)
+- [X] T024 Create main Bicep template in infra/main.bicep with parameters for environment, location, resource naming
+- [X] T025 [P] Create AI Foundry module in infra/modules/ai-foundry.bicep with workspace, model deployments (gpt-4.1-mini, text-embedding-3-large)
+- [X] T026 [P] Create Cosmos DB module in infra/modules/cosmos.bicep with database, collections, partition keys, TTL settings per data-model.md
+- [X] T027 [P] Create Event Hubs module in infra/modules/event-hubs.bicep with namespace, alert-ingestion hub, consumer groups
+- [X] T028 [P] Create Container Apps module in infra/modules/container-apps.bicep with environment, agent services, orchestrator service, API service
+- [X] T029 [P] Create Application Insights module in infra/modules/monitoring.bicep with workspace, Log Analytics, dashboards
+- [X] T030 [P] Create Azure AI Search module in infra/modules/ai-search.bicep with Standard S1 tier, 3 indexes (attack-scenarios, historical-incidents, threat-intelligence)
+- [X] T031 Create parameter files in infra/parameters/: dev.parameters.json, prod.parameters.json with environment-specific settings
+- [X] T032 [P] Create deployment script in utils/deploy_infrastructure.sh using az deployment group create with Bicep templates
+- [ ] T033 Deploy infrastructure to dev environment and verify all services are accessible (User action required - run ./utils/deploy_infrastructure.sh dev)
 
-**NOTE**: Phase 2A infrastructure is NOT complete. Placeholder files created for directory structure, but full Bicep implementation is pending. For MVP demonstration, the system uses mock services and does not require actual Azure infrastructure deployment.
+**NOTE**: Phase 2A infrastructure implementation is COMPLETE. All Bicep templates, modules, and deployment scripts are ready. The final task (T033) requires running the deployment script to provision actual Azure resources. This can be done when ready for testing.
 
-**Checkpoint**: Azure infrastructure deployed - services available for User Story development and testing
+**Checkpoint**: Azure infrastructure templates ready - run deployment script to provision services for User Story development and testing
 
 ---
 
