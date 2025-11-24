@@ -38,7 +38,7 @@ class EventBus:
         self._handlers: Dict[OrchestrationEventType, List[EventHandler]] = {
             event_type: [] for event_type in OrchestrationEventType
         }
-        logger.info("Event bus initialized")
+        logger.debug("Event bus initialized")
     
     def register(
         self,

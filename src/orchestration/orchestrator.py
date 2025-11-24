@@ -29,7 +29,7 @@ class AgentRegistry:
     def __init__(self):
         """Initialize agent registry."""
         self._agents: Dict[str, Any] = {}
-        logger.info("Agent registry initialized")
+        logger.debug("Agent registry initialized")
     
     def register_agent(self, agent_name: str, agent_instance: Any) -> None:
         """
@@ -40,7 +40,7 @@ class AgentRegistry:
             agent_instance: Agent instance
         """
         self._agents[agent_name] = agent_instance
-        logger.info(f"Agent registered: {agent_name}")
+        logger.debug(f"Agent registered: {agent_name}")
     
     def get_agent(self, agent_name: str) -> Optional[Any]:
         """
@@ -80,7 +80,7 @@ class Orchestrator:
         self.event_bus = get_event_bus()
         self._active_workflows: Dict[UUID, Dict[str, Any]] = {}
         
-        logger.info("Orchestrator initialized")
+        logger.debug("Orchestrator initialized")
     
     def register_agent(self, agent_name: str, agent_instance: Any) -> None:
         """

@@ -10,6 +10,10 @@ import asyncio
 import sys
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -26,6 +30,10 @@ logger = get_logger(__name__)
 
 async def demo_agent_framework():
     """Demonstrate alert triage functionality using Microsoft Agent Framework."""
+    
+    print("=" * 80)
+    print("ALERT TRIAGE AGENT - MICROSOFT AGENT FRAMEWORK DEMO")
+    print("=" * 80)
     
     logger.info("=" * 80)
     logger.info("ALERT TRIAGE AGENT - MICROSOFT AGENT FRAMEWORK DEMO")
@@ -68,6 +76,12 @@ async def demo_agent_framework():
         alert_dict = event_data["alert"]
         alert = SecurityAlert(**alert_dict)
         
+        print(f"\n📬 Alert Details:")
+        print(f"   Name: {alert.AlertName}")
+        print(f"   Severity: {alert.Severity}")
+        print(f"   Entities: {len(alert.Entities)}")
+        print(f"\n⏳ Analyzing with AI agent...")
+        
         logger.info(f"\n📬 Processing alert: {alert.AlertName}")
         logger.info(f"   Severity: {alert.Severity}")
         logger.info(f"   Entities: {len(alert.Entities)}")
@@ -76,30 +90,46 @@ async def demo_agent_framework():
         triage_result = await triage_agent.triage_alert(alert)
         
         # Display results
+        print(f"\n" + "─" * 60)
+        print(f"✅ TRIAGE RESULTS")
+        print("─" * 60)
+        print(f"   🎯 Risk Score: {triage_result.RiskScore}/100")
+        print(f"   ⚠️  Priority: {triage_result.Priority}")
+        print(f"   📊 Decision: {triage_result.TriageDecision}")
+        print(f"   🔗 Correlated Alerts: {len(triage_result.CorrelatedAlertIds)}")
+        print(f"   ⏱️  Processing Time: {triage_result.ProcessingTimeMs}ms")
+        print(f"\n🤖 AI Agent Explanation:")
+        print(f"   {triage_result.Explanation[:400]}...")
+        print("")
+        
         logger.info(f"\n✅ Triage completed:")
         logger.info(f"   Risk Score: {triage_result.RiskScore}/100")
         logger.info(f"   Priority: {triage_result.Priority}")
         logger.info(f"   Decision: {triage_result.TriageDecision}")
         logger.info(f"   Correlated Alerts: {len(triage_result.CorrelatedAlertIds)}")
         logger.info(f"   Processing Time: {triage_result.ProcessingTimeMs}ms")
-        logger.info(f"\n🤖 AI Agent Explanation:")
-        logger.info(f"   {triage_result.Explanation[:500]}...")  # First 500 chars
-        logger.info("")
     
     event_bus.register(OrchestrationEventType.ALERT_INGESTION, handle_alert_event)
     
     # Load sample alerts
     logger.info("\n🔍 Loading sample alerts from GUIDE dataset...")
-    alerts = guide_loader.load_alerts(max_alerts=3)  # Start with just 3 for demo
+    alerts = guide_loader.load_alerts(max_alerts=20)  # Start with just 20 for demo
     logger.info(f"Loaded {len(alerts)} alerts\n")
     
     # Process each alert through orchestrator
+    print("\n" + "=" * 80)
+    print("🚀 PROCESSING ALERTS THROUGH ORCHESTRATION PIPELINE")
+    print("=" * 80 + "\n")
     logger.info("🚀 Processing alerts through orchestration pipeline...\n")
     
     try:
         for i, alert in enumerate(alerts, 1):
+            print("\n" + "─" * 80)
+            print(f"📋 ALERT {i}/{len(alerts)}: {alert.AlertName}")
+            print("─" * 80)
             logger.info(f"--- Alert {i}/{len(alerts)} ---")
             await orchestrator.process_alert(alert)
+            print("\n" + "✅ Alert processing complete\n")
             await asyncio.sleep(1)  # Brief pause for readability
     finally:
         # Clean up agent resources
@@ -139,6 +169,10 @@ async def demo_agent_framework():
 if __name__ == "__main__":
     # Configure logging
     configure_logging(log_level="INFO", json_output=False)
+    
+    # Suppress Azure SDK HTTP logging
+    import logging
+    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
     
     # Run demo
     try:

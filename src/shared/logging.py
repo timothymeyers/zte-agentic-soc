@@ -100,11 +100,23 @@ def configure_logging(
     )
     
     # Configure standard library logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=numeric_level,
-    )
+    # Force reconfiguration by clearing existing handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger.addHandler(handler)
+    root_logger.setLevel(numeric_level)
+    
+    # Suppress verbose Azure SDK HTTP logging
+    logging.getLogger("azure").setLevel(logging.WARNING)
+    logging.getLogger("azure.core").setLevel(logging.WARNING)
+    logging.getLogger("azure.core.pipeline").setLevel(logging.WARNING)
+    logging.getLogger("azure.core.pipeline.policies").setLevel(logging.WARNING)
+    logging.getLogger("azure.identity").setLevel(logging.WARNING)
+    logging.getLogger("azure.ai").setLevel(logging.WARNING)
     
     # If Azure Monitor is enabled, configure OpenTelemetry
     if azure_monitor_enabled:

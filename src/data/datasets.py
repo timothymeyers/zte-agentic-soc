@@ -36,7 +36,7 @@ class GUIDEDatasetLoader:
         """
         self.data_path = Path(data_path)
         self._alerts: List[SecurityAlert] = []
-        logger.info(f"GUIDE dataset loader initialized with path: {data_path}")
+        logger.debug(f"GUIDE dataset loader initialized with path: {data_path}")
     
     def load_alerts(
         self,
@@ -168,7 +168,7 @@ class AttackDatasetLoader:
         """
         self.data_path = Path(data_path)
         self._scenarios: List[Dict[str, Any]] = []
-        logger.info(f"Attack dataset loader initialized with path: {data_path}")
+        logger.debug(f"Attack dataset loader initialized with path: {data_path}")
     
     def load_scenarios(self, technique_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
