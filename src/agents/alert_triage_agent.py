@@ -81,18 +81,22 @@ class AlertTriageTools:
         
         logger.debug("Alert Triage Tools initialized")
     
-    @ai_function(description="Calculate risk score for a security alert based on multiple factors")
+    @ai_function(description="Calculate risk score for a security alert based on multiple factors including MITRE attack scenario context")
     def calculate_risk_score(
         severity: Annotated[str, Field(description="Alert severity level (High, Medium, Low, Informational)")],
         entity_count: Annotated[int, Field(description="Number of entities involved in the alert")],
         mitre_techniques: Annotated[List[str], Field(description="List of MITRE ATT&CK technique IDs")],
-        confidence_score: Annotated[int, Field(description="Detection confidence score (0-100)")]
+        confidence_score: Annotated[int, Field(description="Detection confidence score (0-100)")],
+        mitre_scenario_counts: Annotated[List[int], Field(description="List of attack scenario counts for each MITRE technique (e.g., [3, 5, 2] means technique 1 has 3 scenarios, technique 2 has 5, etc.)")] = None
     ) -> str:
         """
         Calculate a risk score for an alert (AI function - no self parameter).
+        This should be called AFTER gathering MITRE context to incorporate scenario counts.
         Returns a JSON string with the risk score and explanation.
         """
-        logger.debug(f"[TOOL] calculate_risk_score called: severity={severity}, entities={entity_count}, mitre={len(mitre_techniques)}, confidence={confidence_score}")
+        import random
+        
+        logger.debug(f"[TOOL] calculate_risk_score called: severity={severity}, entities={entity_count}, mitre={len(mitre_techniques)}, confidence={confidence_score}, scenario_counts={mitre_scenario_counts}")
         
         score = 0
         
@@ -110,16 +114,36 @@ class AlertTriageTools:
         entity_score = min(entity_count * 2, 10)
         score += entity_score
         
-        # MITRE techniques contribution (0-20)
-        mitre_score = min(len(mitre_techniques) * 5, 20)
+        # MITRE techniques contribution with scenario counts (0-25)
+        # Base score for having techniques, plus bonus for high scenario counts
+        base_mitre_score = min(len(mitre_techniques) * 3, 15)
+        scenario_bonus = 0
+        
+        if mitre_scenario_counts:
+            # Award points for techniques with many matching attack scenarios
+            # High scenario count (5+) suggests well-documented, prevalent threats
+            for count in mitre_scenario_counts:
+                if count >= 5:
+                    scenario_bonus += 3
+                elif count >= 3:
+                    scenario_bonus += 2
+                elif count >= 1:
+                    scenario_bonus += 1
+            scenario_bonus = min(scenario_bonus, 10)
+        
+        mitre_score = base_mitre_score + scenario_bonus
         score += mitre_score
         
-        # Asset criticality (0-20) - placeholder for MVP
-        asset_score = 15
+        # TODO: Asset criticality (0-20) - integrate with asset inventory/CMDB tool
+        # For now, randomly assign to simulate variability in asset importance
+        # Production should query asset management system for criticality scores
+        asset_score = random.randint(5, 20)
         score += asset_score
         
-        # User risk level (0-10) - placeholder for MVP
-        user_score = 5
+        # TODO: User risk level (0-10) - integrate with identity/UBA tool
+        # For now, randomly assign to simulate variability in user risk profiles
+        # Production should query identity system or user behavior analytics
+        user_score = random.randint(2, 10)
         score += user_score
         
         # Confidence score (0-10)
@@ -135,16 +159,19 @@ class AlertTriageTools:
                 "severity": severity_score,
                 "entities": entity_score,
                 "mitre_techniques": mitre_score,
+                "mitre_base": base_mitre_score,
+                "mitre_scenario_bonus": scenario_bonus,
                 "asset_criticality": asset_score,
                 "user_risk": user_score,
                 "confidence": confidence_contribution
             },
             "explanation": f"Risk score of {final_score}/100 calculated from {severity} severity, "
-                          f"{entity_count} entities, {len(mitre_techniques)} MITRE techniques, "
-                          f"and {confidence_score}% confidence."
+                          f"{entity_count} entities, {len(mitre_techniques)} MITRE techniques "
+                          f"({scenario_bonus} scenario bonus), asset criticality ({asset_score}), "
+                          f"user risk ({user_score}), and {confidence_score}% confidence."
         }
         
-        logger.debug(f"[TOOL] calculate_risk_score result: {final_score}/100")
+        logger.debug(f"[TOOL] calculate_risk_score result: {final_score}/100 (mitre_bonus: {scenario_bonus})")
         return json.dumps(result)
     
     @ai_function(description="Find related alerts by checking entity overlap")
@@ -180,33 +207,25 @@ class AlertTriageTools:
         logger.debug(f"[TOOL] find_correlated_alerts result: {result['correlated_count']} correlations")
         return json.dumps(result)
     
-    @ai_function(description="Determine triage decision based on risk score and correlation")
+    @ai_function(description="Record the triage decision determined through analysis of risk, correlation, and MITRE context")
     def make_triage_decision(
-        risk_score: Annotated[int, Field(description="Calculated risk score (0-100)")],
-        has_correlation: Annotated[bool, Field(description="Whether the alert correlates with recent alerts")]
+        decision: Annotated[str, Field(description="Triage decision: EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, or RequireHumanReview")],
+        priority: Annotated[str, Field(description="Priority level: Critical, High, Medium, or Low")],
+        rationale: Annotated[str, Field(description="Detailed explanation of the decision considering risk score, correlations, MITRE techniques, and threat context")]
     ) -> str:
         """
-        Make a triage decision based on risk and correlation.
-        Returns a JSON string with the decision and rationale.
-        """
-        logger.debug(f"[TOOL] make_triage_decision called: risk_score={risk_score}, has_correlation={has_correlation}")
+        Record the triage decision after analyzing all available context.
+        The agent should consider:
+        - Risk score and its components
+        - Correlation with recent alerts
+        - MITRE ATT&CK technique severity and prevalence
+        - Attack scenario context
+        - Entity involvement patterns
         
-        if risk_score >= 70:
-            decision = "EscalateToIncident"
-            priority = "Critical" if risk_score >= 80 else "High"
-            rationale = "High risk score indicates potential significant threat requiring immediate incident response."
-        elif risk_score >= 40 and has_correlation:
-            decision = "CorrelateWithExisting"
-            priority = "Medium"
-            rationale = "Moderate risk with correlation suggests part of existing incident or campaign."
-        elif risk_score < 30:
-            decision = "MarkAsFalsePositive"
-            priority = "Low"
-            rationale = "Low risk indicators suggest benign activity or false positive."
-        else:
-            decision = "RequireHumanReview"
-            priority = "Medium"
-            rationale = "Moderate risk without clear correlation requires analyst assessment."
+        Returns a JSON string confirming the decision.
+        """
+        logger.debug(f"[TOOL] make_triage_decision called: decision={decision}, priority={priority}")
+        logger.debug(f"[TOOL] Rationale: {rationale}")
         
         result = {
             "decision": decision,
@@ -572,24 +591,42 @@ class AlertTriageAgent:
             # Build agent instructions
             instructions = """You are an expert security analyst specializing in alert triage.
 
-Your role is to analyze security alerts and make intelligent triage decisions by:
-1. Calculating risk scores based on multiple factors
-2. Finding correlated alerts to detect campaigns
-3. Making triage decisions with clear rationales
-4. Providing actionable recommendations
+Your role is to analyze security alerts and make intelligent triage decisions by gathering context, 
+reasoning about the threat, and providing clear recommendations.
 
-Always use the provided tools to analyze alerts systematically. Your responses should be:
-- Clear and concise
-- Based on evidence from the tools
-- Include risk scores and correlations
-- Provide specific recommendations
+Analysis Process:
+1. Check for correlated alerts to identify potential attack campaigns
+2. If MITRE ATT&CK techniques are present, retrieve detailed context about them (including attack scenario counts)
+3. Calculate the risk score using all available alert factors AND the MITRE scenario counts from step 2
+4. Synthesize all information to determine the appropriate triage decision
 
-When triaging an alert:
-1. First, calculate the risk score using all available factors
-2. Check for correlated alerts
-3. Get MITRE technique context if applicable
-4. Make a triage decision based on risk and correlation
-5. Explain your reasoning clearly"""
+IMPORTANT: Always call get_mitre_context BEFORE calculate_risk_score so that scenario counts can be included in risk calculation.
+
+Decision Factors to Consider:
+- Risk score components (severity, entity count, MITRE techniques, confidence)
+- Correlation patterns with recent alerts (timing, entities, techniques)
+- MITRE technique scenario counts and prevalence in attack patterns
+- Entity types involved and their potential impact
+- Historical context from similar alerts
+
+Make your triage decision based on holistic analysis, not rigid thresholds. Consider:
+- Techniques with high severity or low prevalence may indicate sophisticated threats
+- Correlation across multiple entities suggests coordinated campaigns
+- Multiple MITRE techniques may indicate multi-stage attacks
+- Low-risk alerts with unusual patterns may still warrant investigation
+
+Special Handling for Low-Prevalence Alerts (No Correlations + Low MITRE Scenario Counts):
+- If there are NO correlated alerts AND MITRE techniques have LOW scenario counts (< 3 scenarios per technique):
+  * This suggests an isolated, uncommon alert pattern
+  * DO NOT escalate to incident immediately
+  * Instead, recommend RequireHumanReview with Medium or Low priority
+  * In your rationale, suggest: "Recommend creating monitoring alert for affected users/assets until correlation appears"
+  * NOTE: In production, this would trigger runbook automation to establish watchlist monitoring
+
+Use the make_triage_decision tool to record your decision with:
+- Decision: EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, or RequireHumanReview
+- Priority: Critical, High, Medium, or Low
+- Rationale: Detailed explanation referencing specific evidence from your analysis, including correlation status and scenario counts"""
             
             # Create agent with tools
             if self.project_endpoint:
@@ -682,9 +719,9 @@ Entities involved:
 {chr(10).join([f"- {e['type']}: {e['value']}" for e in entities_list])}
 
 Please:
-1. Calculate the risk score using the calculate_risk_score tool
-2. Check for correlated alerts using the find_correlated_alerts tool
-3. Get MITRE technique context if applicable using the get_mitre_context tool
+1. Check for correlated alerts using the find_correlated_alerts tool
+2. Get MITRE technique context if applicable using the get_mitre_context tool (note the scenario_count for each technique)
+3. Calculate the risk score using the calculate_risk_score tool, passing the scenario counts from step 2 as mitre_scenario_counts parameter
 4. Make a triage decision using the make_triage_decision tool
 5. Provide a clear explanation of your decision and recommendations"""
             
@@ -709,57 +746,90 @@ Please:
                 for idx, msg in enumerate(response.messages):
                     logger.debug(f"  Message {idx}: {type(msg).__name__}")
             
-            # Call tool functions directly to get structured results
-            # (The agent may have already called these, but we need the structured data)
+            # Extract structured results from agent's tool calls
             print("   → Extracting structured results...")
-            logger.debug("🔧 Calling tools to extract structured data...")
+            logger.debug("🔧 Extracting structured data from agent execution...")
             
-            logger.debug("  → calculate_risk_score")
-            risk_result_json = self.tools.calculate_risk_score(
-                severity=alert.Severity,
-                entity_count=len(alert.Entities),
-                mitre_techniques=mitre_techniques,
-                confidence_score=confidence
-            )
-            risk_data = json.loads(risk_result_json)
-            risk_score = risk_data["risk_score"]
-            logger.debug(f"    Risk Score: {risk_score}/100")
-            logger.debug(f"    Breakdown: {risk_data.get('breakdown', {})}")
+            # Parse tool call results from agent's message history
+            risk_score = 50  # Default
+            correlated_alert_ids = []
+            decision = TriageDecision.REQUIRE_HUMAN_REVIEW
+            priority = TriagePriority.MEDIUM
+            decision_rationale = ""
             
-            logger.debug("  → find_correlated_alerts")
-            correlation_result_json = self.tools.find_correlated_alerts(
-                alert_entities=entities_list
-            )
-            correlation_data = json.loads(correlation_result_json)
-            correlated_alert_ids = [UUID(a["alert_id"]) for a in correlation_data.get("correlated_alerts", [])]
-            logger.debug(f"    Correlated Alerts: {len(correlated_alert_ids)}")
+            # Extract tool call results from messages
+            if hasattr(response, 'messages'):
+                for msg in response.messages:
+                    # Check for tool call results in message content
+                    if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                        for tool_call in msg.tool_calls:
+                            logger.debug(f"  Found tool call: {tool_call.function.name}")
+                    
+                    # Check for tool responses
+                    if hasattr(msg, 'role') and msg.role == 'tool':
+                        tool_name = getattr(msg, 'name', '')
+                        tool_content = getattr(msg, 'content', '{}')
+                        
+                        try:
+                            tool_result = json.loads(tool_content) if isinstance(tool_content, str) else tool_content
+                            
+                            if 'risk_score' in str(tool_name).lower() or 'risk_score' in tool_result:
+                                risk_score = tool_result.get('risk_score', risk_score)
+                                logger.debug(f"    Extracted risk_score: {risk_score}")
+                            
+                            elif 'correlation' in str(tool_name).lower() or 'correlated_alerts' in tool_result:
+                                corr_alerts = tool_result.get('correlated_alerts', [])
+                                correlated_alert_ids = [UUID(a['alert_id']) for a in corr_alerts if 'alert_id' in a]
+                                logger.debug(f"    Extracted {len(correlated_alert_ids)} correlated alerts")
+                            
+                            elif 'decision' in tool_result and 'priority' in tool_result:
+                                # Extract triage decision
+                                decision_str = tool_result.get('decision', '')
+                                priority_str = tool_result.get('priority', '')
+                                decision_rationale = tool_result.get('rationale', '')
+                                
+                                # Map to enums
+                                decision_map = {
+                                    "EscalateToIncident": TriageDecision.ESCALATE_TO_INCIDENT,
+                                    "CorrelateWithExisting": TriageDecision.CORRELATE_WITH_EXISTING,
+                                    "MarkAsFalsePositive": TriageDecision.MARK_AS_FALSE_POSITIVE,
+                                    "RequireHumanReview": TriageDecision.REQUIRE_HUMAN_REVIEW
+                                }
+                                priority_map = {
+                                    "Critical": TriagePriority.CRITICAL,
+                                    "High": TriagePriority.HIGH,
+                                    "Medium": TriagePriority.MEDIUM,
+                                    "Low": TriagePriority.LOW
+                                }
+                                
+                                decision = decision_map.get(decision_str, TriageDecision.REQUIRE_HUMAN_REVIEW)
+                                priority = priority_map.get(priority_str, TriagePriority.MEDIUM)
+                                
+                                logger.debug(f"    Extracted decision: {decision_str} -> {decision}")
+                                logger.debug(f"    Extracted priority: {priority_str} -> {priority}")
+                                logger.debug(f"    Rationale: {decision_rationale[:100]}...")
+                        
+                        except (json.JSONDecodeError, ValueError, KeyError) as e:
+                            logger.debug(f"    Could not parse tool result: {e}")
+                            continue
             
-            logger.debug("  → make_triage_decision")
-            decision_result_json = self.tools.make_triage_decision(
-                risk_score=risk_score,
-                has_correlation=correlation_data.get("has_correlation", False)
-            )
-            decision_data = json.loads(decision_result_json)
-            logger.debug(f"    Decision: {decision_data['decision']}")
-            logger.debug(f"    Priority: {decision_data['priority']}")
-            logger.debug(f"    Rationale: {decision_data['rationale']}")
+            # Fallback: parse from response text if tool results not found
+            if decision == TriageDecision.REQUIRE_HUMAN_REVIEW and decision_rationale == "":
+                logger.debug("  Falling back to text parsing for decision")
+                response_lower = response_text.lower()
+                if "escalate" in response_lower and "incident" in response_lower:
+                    decision = TriageDecision.ESCALATE_TO_INCIDENT
+                    priority = TriagePriority.CRITICAL if "critical" in response_lower else TriagePriority.HIGH
+                elif "correlate" in response_lower:
+                    decision = TriageDecision.CORRELATE_WITH_EXISTING
+                    priority = TriagePriority.MEDIUM
+                elif "false positive" in response_lower:
+                    decision = TriageDecision.MARK_AS_FALSE_POSITIVE
+                    priority = TriagePriority.LOW
             
-            # Map decision strings to enums
-            priority_map = {
-                "Critical": TriagePriority.CRITICAL,
-                "High": TriagePriority.HIGH,
-                "Medium": TriagePriority.MEDIUM,
-                "Low": TriagePriority.LOW
-            }
-            decision_map = {
-                "EscalateToIncident": TriageDecision.ESCALATE_TO_INCIDENT,
-                "CorrelateWithExisting": TriageDecision.CORRELATE_WITH_EXISTING,
-                "MarkAsFalsePositive": TriageDecision.MARK_AS_FALSE_POSITIVE,
-                "RequireHumanReview": TriageDecision.REQUIRE_HUMAN_REVIEW
-            }
-            
-            priority = priority_map.get(decision_data["priority"], TriagePriority.MEDIUM)
-            decision = decision_map.get(decision_data["decision"], TriageDecision.REQUIRE_HUMAN_REVIEW)
+            logger.debug(f"    Final Decision: {decision}")
+            logger.debug(f"    Final Priority: {priority}")
+            logger.debug(f"    Final Risk Score: {risk_score}")
             
             # Calculate processing time
             processing_time_ms = int((time.time() - start_time) * 1000)
@@ -774,7 +844,7 @@ Please:
                 TriageDecision=decision,
                 Explanation=response_text,  # AI-generated explanation
                 CorrelatedAlertIds=correlated_alert_ids,
-                EnrichmentData=risk_data.get("breakdown", {}),
+                EnrichmentData={},  # Agent reasoning is in Explanation
                 ProcessingTimeMs=processing_time_ms,
                 AgentVersion=self.agent_version
             )
