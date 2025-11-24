@@ -40,7 +40,7 @@ async def demo_agent_framework():
     logger.info("=" * 80)
     
     # Check for required environment variables
-    project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+    project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT") or os.getenv("AZURE_AI_FOUNDRY_ENDPOINT")
     model_deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
     
     if not project_endpoint:
@@ -127,7 +127,7 @@ async def demo_agent_framework():
     
     # Load sample alerts
     logger.info("\n🔍 Loading sample alerts from GUIDE dataset...")
-    alerts = guide_loader.load_alerts(max_alerts=20)  # Start with just 20 for demo
+    alerts = guide_loader.load_alerts(max_alerts=1)  # Start with just 1 for demo
     logger.info(f"Loaded {len(alerts)} alerts\n")
     
     # Process each alert through orchestrator
@@ -183,9 +183,9 @@ async def demo_agent_framework():
 
 if __name__ == "__main__":
     # Configure logging
-    configure_logging(log_level="INFO", json_output=False)
+    configure_logging(log_level="DEBUG", json_output=False)
     
-    # Suppress Azure SDK HTTP logging
+    # Suppress Azure SDK HTTP logging (optional - comment out to see Azure SDK debug info)
     import logging
     logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
     

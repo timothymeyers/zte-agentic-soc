@@ -8,6 +8,8 @@ This agent uses the Microsoft Agent Framework with custom tools for:
 - Natural language explanations
 """
 
+# TODO: Refactor AI Search Integration to use native Microsoft Agent Framework or Microsoft Foundry Agent capabilities (post ignite updates)
+
 import asyncio
 import os
 import json
@@ -37,7 +39,7 @@ from src.data.datasets import get_attack_loader
 try:
     from azure.search.documents.aio import SearchClient
     from azure.core.credentials import AzureKeyCredential
-    from azure.identity import DefaultAzureCredential
+    from azure.identity.aio import DefaultAzureCredential
     SEARCH_AVAILABLE = True
 except ImportError:
     SEARCH_AVAILABLE = False
@@ -45,6 +47,13 @@ except ImportError:
 
 
 logger = get_logger(__name__)
+
+
+# Module-level storage for search client access (needed for @ai_function tools)
+_search_client_config = {
+    'endpoint': None,
+    'credential': None
+}
 
 
 class AlertTriageTools:
@@ -64,6 +73,12 @@ class AlertTriageTools:
         self._recent_alerts: List[SecurityAlert] = []
         self.search_endpoint = search_endpoint
         self.search_credential = search_credential
+        
+        # Store search config in module-level variable for tool access
+        global _search_client_config
+        _search_client_config['endpoint'] = search_endpoint
+        _search_client_config['credential'] = search_credential
+        
         logger.debug("Alert Triage Tools initialized")
     
     @ai_function(description="Calculate risk score for a security alert based on multiple factors")
@@ -202,38 +217,149 @@ class AlertTriageTools:
         logger.debug(f"[TOOL] make_triage_decision result: {decision} (priority: {priority})")
         return json.dumps(result)
     
-    @ai_function(description="Get MITRE ATT&CK technique information from the Attack dataset")
+    @ai_function(description="Get MITRE ATT&CK technique information from Azure AI Search")
     def get_mitre_context(
         technique_ids: Annotated[List[str], Field(description="List of MITRE ATT&CK technique IDs (e.g., ['T1059.001'])")]
     ) -> str:
         """
-        Retrieve MITRE ATT&CK technique details from the Attack dataset.
-        Returns a JSON string with technique information.
-        
-        Note: This is a standalone function for Azure AI compatibility.
-        It cannot access attack_loader without self, so returns placeholder data for MVP.
+        Retrieve MITRE ATT&CK technique details from Azure AI Search.
+        Returns a JSON string with technique information including attack scenarios.
         """
         logger.debug(f"[TOOL] get_mitre_context called with {len(technique_ids)} techniques")
         
-        # For MVP: Return placeholder MITRE info since we can't access attack_loader without self
-        # In production, this would query a MITRE ATT&CK database
-        techniques = []
-        for technique_id in technique_ids:
-            techniques.append({
-                "technique_id": technique_id,
-                "name": f"Technique {technique_id}",
-                "tactic": "Execution",
-                "description": "MITRE ATT&CK technique (database integration required for full details)"
+        # Access module-level search config
+        global _search_client_config
+        search_endpoint = _search_client_config.get('endpoint')
+        search_credential = _search_client_config.get('credential')
+        
+        if not SEARCH_AVAILABLE or not search_endpoint or not search_credential:
+            logger.warning("[TOOL] AI Search not configured - returning basic MITRE data")
+            techniques = []
+            for technique_id in technique_ids:
+                techniques.append({
+                    "technique_id": technique_id,
+                    "name": f"MITRE ATT&CK Technique {technique_id}",
+                    "tactic": "Execution",
+                    "description": "AI Search not configured"
+                })
+            return json.dumps({
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "mock_no_search"
             })
         
-        result = {
-            "techniques": techniques,
-            "count": len(techniques),
-            "note": "Full MITRE context requires database integration (MVP limitation)"
-        }
-        
-        logger.debug(f"[TOOL] get_mitre_context result: {len(techniques)} techniques returned")
-        return json.dumps(result)
+        try:
+            # Run async search synchronously
+            import asyncio
+            
+            async def _query_search():
+                """Async helper to query AI Search."""
+                search_client = SearchClient(
+                    endpoint=search_endpoint,
+                    index_name="attack-scenarios",
+                    credential=search_credential
+                )
+                
+                techniques = []
+                for technique_id in technique_ids:
+                    logger.debug(f"  [TOOL] Searching for technique: {technique_id}")
+                    
+                    # Search for scenarios matching this technique
+                    results = await search_client.search(
+                        search_text=technique_id,
+                        #filter=f"mitre_techniques/any(t: t eq '{technique_id}')",
+                        filter="",
+                        select=["name", "mitre_techniques", "mitre_tactics", "severity", "description"],
+                        top=3  # Limit to 3 scenarios for token efficiency
+                    )
+                    
+                    attack_scenarios = []
+                    async for result in results:
+                        attack_scenarios.append({
+                            "scenario_name": result.get("name", "Unknown"),
+                            "description": result.get("description", "")[:200],  # Truncate for efficiency
+                            "tactic": result.get("mitre_tactics", ["Unknown"])[0] if result.get("mitre_tactics") else "Unknown",
+                            "severity": result.get("severity", "")
+                        })
+                    
+                    # Aggregate data from all scenarios
+                    if attack_scenarios:
+                        # Collect unique tactics from all scenarios
+                        all_tactics = list(set([s["tactic"] for s in attack_scenarios if s["tactic"] != "Unknown"]))
+                        # Use first scenario name as primary, combine descriptions
+                        combined_description = " | ".join([s["description"] for s in attack_scenarios[:2]])  # First 2 for brevity
+                        # Get highest severity
+                        severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "": 0}
+                        highest_severity = max([severity_order.get(s["severity"].lower(), 0) for s in attack_scenarios])
+                        severity_label = [k for k, v in severity_order.items() if v == highest_severity][0] if highest_severity > 0 else ""
+                        
+                        techniques.append({
+                            "technique_id": technique_id,
+                            "name": attack_scenarios[0]["scenario_name"],
+                            "tactic": all_tactics[0] if all_tactics else "Unknown",
+                            "all_tactics": all_tactics,
+                            "description": combined_description,
+                            "severity": severity_label,
+                            "scenario_count": len(attack_scenarios),
+                            "scenarios": attack_scenarios
+                        })
+                    else:
+                        techniques.append({
+                            "technique_id": technique_id,
+                            "name": f"Technique {technique_id}",
+                            "tactic": "Unknown",
+                            "all_tactics": [],
+                            "description": "",
+                            "severity": "",
+                            "scenario_count": 0,
+                            "scenarios": []
+                        })
+                    
+                    logger.debug(f"    [TOOL] Found {len(attack_scenarios)} attack scenarios")
+                    logger.debug(f"    [TOOL] Technique {technique_id} details: {techniques[-1]}")  
+                
+                await search_client.close()
+                return techniques
+            
+            # Run the async function using asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an async context, use run_in_executor
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    techniques = executor.submit(
+                        lambda: asyncio.run(_query_search())
+                    ).result(timeout=10)
+            except RuntimeError:
+                # No running loop, can use asyncio.run directly
+                techniques = asyncio.run(_query_search())
+            
+            result = {
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "azure_ai_search"
+            }
+            
+            logger.debug(f"[TOOL] get_mitre_context result: {len(techniques)} techniques from Azure AI Search")
+            return json.dumps(result)
+            
+        except Exception as e:
+            logger.error(f"[TOOL] get_mitre_context failed: {e}", exc_info=True)
+            # Return basic data on error
+            techniques = []
+            for technique_id in technique_ids:
+                techniques.append({
+                    "technique_id": technique_id,
+                    "name": f"Technique {technique_id}",
+                    "tactic": "Unknown",
+                    "description": f"Error: {str(e)[:100]}"
+                })
+            return json.dumps({
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "error_fallback",
+                "error": str(e)[:200]
+            })
     
     def store_alert(self, alert: SecurityAlert) -> None:
         """Store alert for future correlation (in-memory for MVP)."""
@@ -286,29 +412,61 @@ class AlertTriageTools:
                 # Search for scenarios matching this technique
                 results = await search_client.search(
                     search_text=technique_id,
-                    filter=f"mitre_techniques/any(t: t eq '{technique_id}')",
-                    select=["scenario_name", "mitre_techniques", "tactic", "severity", "description", "indicators"],
-                    top=5
+                    filter=f"",
+                    select=["name", "mitre_techniques", "mitre_tactics", "severity", "description", "iocs"],
+                    top=20 # TODO: Make this configurable
                 )
                 
                 attack_scenarios = []
                 async for result in results:
-                    attack_scenarios.append({
-                        "scenario_name": result.get("scenario_name", "Unknown"),
-                        "description": result.get("description", ""),
-                        "tactic": result.get("tactic", ""),
-                        "severity": result.get("severity", ""),
-                        "indicators": result.get("indicators", [])
-                    })
+                    # Filter by search score >= 7.0
+                    search_score = result.get("@search.score", 0)
+                    if search_score >= 7.0:   # TODO: Make this configurable
+                        attack_scenarios.append({
+                            "scenario_name": result.get("name", "Unknown"),
+                            "description": result.get("description", ""),
+                            "tactic": result.get("mitre_tactics", ["Unknown"])[0] if result.get("mitre_tactics") else "Unknown",
+                            "severity": result.get("severity", ""),
+                            "indicators": result.get("iocs", "").split(", ") if result.get("iocs") else [],
+                            "search_score": search_score
+                        })
                 
-                techniques.append({
-                    "technique_id": technique_id,
-                    "name": attack_scenarios[0]["scenario_name"] if attack_scenarios else f"Technique {technique_id}",
-                    "tactic": attack_scenarios[0]["tactic"] if attack_scenarios else "Unknown",
-                    "description": attack_scenarios[0]["description"] if attack_scenarios else "",
-                    "attack_scenarios": attack_scenarios,
-                    "scenario_count": len(attack_scenarios)
-                })
+                # Aggregate data from all scenarios
+                if attack_scenarios:
+                    # Collect unique tactics from all scenarios
+                    all_tactics = list(set([s["tactic"] for s in attack_scenarios if s["tactic"] != "Unknown"]))
+                    # Combine indicators from all scenarios
+                    all_indicators = list(set([ind for s in attack_scenarios for ind in s["indicators"]]))
+                    # Get highest severity
+                    severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "": 0}
+                    highest_severity = max([severity_order.get(s["severity"].lower(), 0) for s in attack_scenarios])
+                    severity_label = [k for k, v in severity_order.items() if v == highest_severity][0] if highest_severity > 0 else ""
+                    # Use best match (highest score) as primary
+                    best_match = max(attack_scenarios, key=lambda s: s["search_score"])
+                    
+                    techniques.append({
+                        "technique_id": technique_id,
+                        "name": best_match["scenario_name"],
+                        "tactic": all_tactics[0] if all_tactics else "Unknown",
+                        "all_tactics": all_tactics,
+                        "description": best_match["description"],
+                        "severity": severity_label,
+                        "indicators": all_indicators,
+                        "attack_scenarios": attack_scenarios,
+                        "scenario_count": len(attack_scenarios)
+                    })
+                else:
+                    techniques.append({
+                        "technique_id": technique_id,
+                        "name": f"Technique {technique_id}",
+                        "tactic": "Unknown",
+                        "all_tactics": [],
+                        "description": "",
+                        "severity": "",
+                        "indicators": [],
+                        "attack_scenarios": [],
+                        "scenario_count": 0
+                    })
                 
                 logger.debug(f"    Found {len(attack_scenarios)} attack scenarios")
             
@@ -370,14 +528,14 @@ class AlertTriageAgent:
         """
         self.agent_version = agent_version
         self.agent_name = "AlertTriageAgent"
-        self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+        self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT") or os.getenv("AZURE_AI_FOUNDRY_ENDPOINT")
         self.model_deployment_name = model_deployment_name or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
         self.search_endpoint = search_endpoint or os.getenv("AZURE_SEARCH_ENDPOINT")
         
         # Setup search credential if endpoint provided
         search_credential = None
         if self.search_endpoint:
-            search_key = os.getenv("AZURE_SEARCH_API_KEY")
+            search_key = os.getenv("AZURE_SEARCH_KEY") or os.getenv("AZURE_SEARCH_API_KEY")
             if search_key:
                 search_credential = AzureKeyCredential(search_key)
             else:
@@ -406,6 +564,10 @@ class AlertTriageAgent:
         if self._agent is None:
             # Create credential
             self._credential = AzureCliCredential()
+            
+            # Set environment variable for Azure AI Agent Framework if not already set
+            if self.project_endpoint and not os.getenv("AZURE_AI_PROJECT_ENDPOINT"):
+                os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
             
             # Build agent instructions
             instructions = """You are an expert security analyst specializing in alert triage.
