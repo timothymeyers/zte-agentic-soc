@@ -1,8 +1,139 @@
-# Alert Triage Agent - Microsoft Agent Framework Implementation
+# Agentic SOC MVP - Implementation Guide
 
 ## Overview
 
-The Alert Triage Agent has been completely refactored to use the **Microsoft Agent Framework** and **Azure AI Foundry SDK**, replacing the custom implementation with proper framework integration.
+This document describes the implementation of the AI-powered Security Operations Center MVP using **Microsoft Agent Framework** and **Azure AI Foundry SDK** with **GPT-4.1-mini**.
+
+The MVP delivers a functional Alert Triage Agent (`src/agents/alert_triage_agent.py`) that demonstrates intelligent security alert analysis, risk scoring, correlation detection, and explainable decision-making.
+
+## What Was Delivered
+
+### ✅ Alert Triage Agent (Microsoft Agent Framework)
+
+A fully functional AI agent implementing the Microsoft Agent Framework pattern with:
+
+**File**: `src/agents/alert_triage_agent.py`
+
+**Framework Integration**:
+- `ChatAgent` from `agent-framework` library
+- `@ai_function` decorated tools
+- `AzureAIAgentClient` for Azure AI Foundry
+- `AIProjectClient` from `azure-ai-projects`
+- GPT-4.1-mini model deployment
+
+**4 AI Function Tools**:
+1. **calculate_risk_score** - Multi-factor risk calculation (0-100)
+   - Alert severity (30%), Entity count (10%), MITRE techniques (20%)
+   - Asset criticality (20%), User risk level (10%), Confidence (10%)
+   
+2. **find_correlated_alerts** - Entity-based correlation detection
+   - Detects related alerts by host, user, IP address overlap
+   - Maintains historical context (last 1000 alerts)
+
+3. **make_triage_decision** - Intelligent triage logic
+   - Escalate to incident (risk ≥ 70)
+   - Correlate with existing (risk ≥ 40 + correlation)
+   - Mark as false positive (risk < 30)
+   - Require human review (moderate risk)
+
+4. **get_mitre_context** - MITRE ATT&CK enrichment
+   - Queries Attack dataset for technique details
+   - Provides threat intelligence context
+
+**AI-Powered Decision Making**: The agent uses GPT-4.1-mini to:
+- Analyze alerts and call appropriate tools
+- Generate natural language explanations
+- Make intelligent triage recommendations
+- Provide context-aware rationales
+
+### ✅ Foundational Infrastructure
+
+**Data Models** (`src/shared/schemas.py`):
+- 30+ Pydantic schemas aligned with Microsoft Sentinel/Graph Security API
+- SecurityAlert, SecurityIncident, TriageResult, ResponseAction, etc.
+- Type-safe validation throughout
+
+**Authentication** (`src/shared/auth.py`):
+- Azure Managed Identity with DefaultAzureCredential
+- Service principal fallback for development
+
+**Observability** (`src/shared/logging.py`, `src/shared/metrics.py`):
+- Structured JSON logging with correlation IDs
+- Prometheus-style metrics (counters, histograms)
+- Distributed tracing support
+
+**Data Access** (`src/data/cosmos.py`):
+- Async Cosmos DB client with TTL support
+- Connection pooling and error handling
+
+**Mock Services**:
+- `src/mock/sentinel_mock.py` - Sentinel API client
+- `src/mock/defender_mock.py` - Defender XDR API client
+- `src/mock/stream.py` - Configurable data streaming
+
+**Datasets**:
+- `src/data/datasets.py` - GUIDE loader (1.17M+ incidents), Attack loader (14K+ scenarios)
+- MITRE ATT&CK mappings and threat intelligence
+
+**API** (`src/api/main.py`):
+- FastAPI application with health/readiness/metrics endpoints
+
+**Event Bus** (`src/orchestration/event_handlers.py`):
+- Pub/sub event coordination
+- Agent-to-agent communication infrastructure
+
+**Audit Logging** (`src/shared/audit.py`):
+- Immutable compliance trail
+- Actor, action, target entity tracking
+
+### ✅ Orchestration Framework
+
+**Orchestrator** (`src/orchestration/orchestrator.py`):
+- Agent registry and lifecycle management
+- Event-driven coordination
+- Workflow context propagation
+
+**Workflows** (`src/orchestration/workflows.py`):
+- Alert triage workflow template
+- Incident response workflow template
+- Threat hunting workflow template
+
+### ⚠️ Infrastructure as Code (Partial)
+
+**Status**: Placeholder files created, full implementation pending
+
+**Created**:
+- `infra/main.bicep` - Main template (placeholder)
+- `infra/parameters/dev.parameters.json` - Dev environment config
+- `infra/README.md` - Documentation
+
+**Pending** (Phase 2A tasks T024-T033):
+- AI Foundry workspace Bicep module
+- Cosmos DB module
+- Event Hubs module
+- Container Apps module
+- Application Insights module
+- Azure AI Search module
+- Deployment scripts
+
+**Note**: For MVP demonstration, the system uses mock services and does not require actual Azure infrastructure deployment.
+
+### ✅ Utilities
+
+**Cosmos DB Setup** (`utils/setup_cosmos_db.py`):
+- Creates required collections
+- Configures TTL and partition keys
+- Initializes database schema
+
+**AI Search Setup** (`utils/setup_ai_search.py`):
+- Creates attack-scenarios, historical-incidents, threat-intelligence indexes
+- Loads Attack dataset (TODO: implementation pending)
+- Azure AI Search integration for RAG knowledge base
+
+**Demo Script** (`utils/demo_agent_framework.py`):
+- Demonstrates Alert Triage Agent functionality
+- Shows Microsoft Agent Framework usage
+- Requires Azure AI Foundry endpoint or Ollama (planned)
 
 ## Architecture
 

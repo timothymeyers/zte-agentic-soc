@@ -18,7 +18,7 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agents.alert_triage.agent_framework import get_triage_agent
+from src.agents.alert_triage_agent import get_triage_agent
 from src.data.datasets import get_guide_loader
 from src.shared.logging import configure_logging, get_logger
 from src.orchestration.orchestrator import get_orchestrator
