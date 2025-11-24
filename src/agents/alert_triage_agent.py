@@ -240,6 +240,105 @@ class AlertTriageTools:
         self._recent_alerts.append(alert)
         if len(self._recent_alerts) > 1000:
             self._recent_alerts.pop(0)
+    
+    async def get_mitre_context_from_search(self, technique_ids: List[str]) -> Dict[str, Any]:
+        """
+        Query Azure AI Search for MITRE ATT&CK technique context.
+        
+        Args:
+            technique_ids: List of MITRE technique IDs (e.g., ['T1059.001'])
+            
+        Returns:
+            Dict with technique information from AI Search or mock fallback
+        """
+        logger.debug(f"get_mitre_context_from_search called with {len(technique_ids)} techniques")
+        
+        if not SEARCH_AVAILABLE or not self.search_endpoint or not self.search_credential:
+            logger.warning("AI Search not configured - returning mock MITRE data")
+            # Fallback to mock data
+            techniques = []
+            for technique_id in technique_ids:
+                techniques.append({
+                    "technique_id": technique_id,
+                    "name": f"Technique {technique_id}",
+                    "tactic": "Execution",
+                    "description": "Mock MITRE data (AI Search not configured)",
+                    "attack_scenarios": []
+                })
+            return {
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "mock"
+            }
+        
+        try:
+            # Create search client for attack-scenarios index
+            search_client = SearchClient(
+                endpoint=self.search_endpoint,
+                index_name="attack-scenarios",
+                credential=self.search_credential
+            )
+            
+            techniques = []
+            for technique_id in technique_ids:
+                logger.debug(f"  Searching for technique: {technique_id}")
+                
+                # Search for scenarios matching this technique
+                results = await search_client.search(
+                    search_text=technique_id,
+                    filter=f"mitre_techniques/any(t: t eq '{technique_id}')",
+                    select=["scenario_name", "mitre_techniques", "tactic", "severity", "description", "indicators"],
+                    top=5
+                )
+                
+                attack_scenarios = []
+                async for result in results:
+                    attack_scenarios.append({
+                        "scenario_name": result.get("scenario_name", "Unknown"),
+                        "description": result.get("description", ""),
+                        "tactic": result.get("tactic", ""),
+                        "severity": result.get("severity", ""),
+                        "indicators": result.get("indicators", [])
+                    })
+                
+                techniques.append({
+                    "technique_id": technique_id,
+                    "name": attack_scenarios[0]["scenario_name"] if attack_scenarios else f"Technique {technique_id}",
+                    "tactic": attack_scenarios[0]["tactic"] if attack_scenarios else "Unknown",
+                    "description": attack_scenarios[0]["description"] if attack_scenarios else "",
+                    "attack_scenarios": attack_scenarios,
+                    "scenario_count": len(attack_scenarios)
+                })
+                
+                logger.debug(f"    Found {len(attack_scenarios)} attack scenarios")
+            
+            await search_client.close()
+            
+            logger.info(f"Retrieved MITRE context for {len(techniques)} techniques from AI Search")
+            return {
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "azure_ai_search"
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to query AI Search for MITRE context: {e}", exc_info=True)
+            # Fallback to mock data
+            techniques = []
+            for technique_id in technique_ids:
+                techniques.append({
+                    "technique_id": technique_id,
+                    "name": f"Technique {technique_id}",
+                    "tactic": "Execution",
+                    "description": f"AI Search query failed: {str(e)}",
+                    "attack_scenarios": []
+                })
+            return {
+                "techniques": techniques,
+                "count": len(techniques),
+                "source": "mock_fallback",
+                "error": str(e)
+            }
 
 
 class AlertTriageAgent:
