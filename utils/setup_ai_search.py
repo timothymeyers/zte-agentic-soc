@@ -212,22 +212,49 @@ class AISearchSetup:
         """Load Attack dataset into attack-scenarios index"""
         logger.info("Loading Attack dataset into attack-scenarios index...")
 
-        # TODO: Implement actual Attack dataset loading
-        # For now, this is a placeholder that would:
-        # 1. Load Attack dataset using AttackDatasetLoader
-        # 2. Transform to search documents
-        # 3. Batch upload to AI Search
-
-        logger.warning("⚠️  TODO: Attack dataset loading not yet implemented")
-        logger.info(
-            "Next steps: Implement AttackDatasetLoader integration and batch upload"
-        )
-
-        # Placeholder for implementation:
-        # loader = AttackDatasetLoader()
-        # scenarios = await loader.load_scenarios()
-        # search_client = SearchClient(endpoint=self.endpoint, index_name="attack-scenarios", credential=self.credential)
-        # await search_client.upload_documents(documents=scenarios)
+        try:
+            # Load Attack dataset
+            loader = AttackDatasetLoader()
+            scenarios = loader.load_scenarios()
+            
+            if not scenarios:
+                logger.warning("No scenarios loaded from Attack dataset")
+                return
+            
+            # Transform to search documents
+            documents = []
+            for scenario in scenarios:
+                doc = {
+                    "id": scenario["scenario_id"],
+                    "name": scenario["name"],
+                    "description": scenario["description"],
+                    "mitre_techniques": [scenario["technique"]],
+                    "mitre_tactics": [scenario["tactic"]],
+                    "severity": scenario["severity"],
+                    "iocs": ", ".join(scenario.get("indicators", [])),
+                    "attack_scenario": scenario["description"]
+                }
+                documents.append(doc)
+            
+            # Batch upload to AI Search
+            search_client = SearchClient(
+                endpoint=self.endpoint,
+                index_name="attack-scenarios",
+                credential=self.credential
+            )
+            
+            async with search_client:
+                result = await search_client.upload_documents(documents=documents)
+                logger.info(f"✅ Uploaded {len(documents)} attack scenarios to AI Search")
+                
+                # Check for any failures
+                failed = [r for r in result if not r.succeeded]
+                if failed:
+                    logger.warning(f"⚠️  {len(failed)} documents failed to upload")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to load Attack dataset: {e}")
+            raise
 
     async def setup_all(self) -> None:
         """Create all indexes and load data"""

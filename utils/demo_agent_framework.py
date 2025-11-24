@@ -108,6 +108,20 @@ async def demo_agent_framework():
         logger.info(f"   Decision: {triage_result.TriageDecision}")
         logger.info(f"   Correlated Alerts: {len(triage_result.CorrelatedAlertIds)}")
         logger.info(f"   Processing Time: {triage_result.ProcessingTimeMs}ms")
+        
+        # Get MITRE enrichment if applicable
+        mitre_techniques = alert.ExtendedProperties.get("MitreTechniques", [])
+        if mitre_techniques:
+            print(f"\n🔍 Enriching with MITRE ATT&CK context from AI Search...")
+            mitre_context = await triage_agent.enrich_with_mitre_context(mitre_techniques)
+            
+            print(f"\n📚 MITRE ATT&CK Enrichment ({mitre_context['source']}):")
+            for technique in mitre_context['techniques']:
+                print(f"   • {technique['technique_id']}: {technique['name']}")
+                print(f"     Tactic: {technique['tactic']}")
+                if technique.get('scenarios'):
+                    print(f"     Attack Scenarios: {len(technique['scenarios'])} found")
+            print("")
     
     event_bus.register(OrchestrationEventType.ALERT_INGESTION, handle_alert_event)
     
@@ -147,6 +161,7 @@ async def demo_agent_framework():
     logger.info("✓ Agent-powered correlation detection")
     logger.info("✓ Agent-powered triage decisions")
     logger.info("✓ AI-generated natural language explanations")
+    logger.info("✓ MITRE ATT&CK enrichment from AI Search")
     logger.info("✓ Audit logging and metrics")
     logger.info("✓ Event-driven orchestration")
     logger.info("")
@@ -158,11 +173,11 @@ async def demo_agent_framework():
     logger.info("    ├─ calculate_risk_score")
     logger.info("    ├─ find_correlated_alerts")
     logger.info("    ├─ make_triage_decision")
-    logger.info("    └─ get_mitre_context")
+    logger.info("    └─ get_mitre_context (with AI Search lookup)")
     logger.info("    ↓")
     logger.info("  AI Model (GPT-4.1-mini via Azure AI Foundry)")
     logger.info("    ↓")
-    logger.info("  Structured Output (TriageResult)")
+    logger.info("  Structured Output (TriageResult) + MITRE Enrichment")
     logger.info("")
 
 

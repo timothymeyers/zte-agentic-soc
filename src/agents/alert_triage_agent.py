@@ -34,6 +34,15 @@ from src.shared.metrics import counter
 from src.shared.audit import get_audit_service, AuditResult
 from src.data.datasets import get_attack_loader
 
+try:
+    from azure.search.documents.aio import SearchClient
+    from azure.core.credentials import AzureKeyCredential
+    from azure.identity import DefaultAzureCredential
+    SEARCH_AVAILABLE = True
+except ImportError:
+    SEARCH_AVAILABLE = False
+    logger.warning("Azure Search libraries not available - MITRE lookups will use mock data")
+
 
 logger = get_logger(__name__)
 
@@ -49,10 +58,12 @@ class AlertTriageTools:
     standalone-style functions (not typical instance methods).
     """
     
-    def __init__(self):
+    def __init__(self, search_endpoint: Optional[str] = None, search_credential = None):
         """Initialize alert triage tools."""
         self.attack_loader = get_attack_loader()
         self._recent_alerts: List[SecurityAlert] = []
+        self.search_endpoint = search_endpoint
+        self.search_credential = search_credential
         logger.debug("Alert Triage Tools initialized")
     
     @ai_function(description="Calculate risk score for a security alert based on multiple factors")
@@ -246,7 +257,8 @@ class AlertTriageAgent:
         self,
         project_endpoint: Optional[str] = None,
         model_deployment_name: Optional[str] = None,
-        agent_version: str = "0.2.0"
+        search_endpoint: Optional[str] = None,
+        agent_version: str = "0.3.0"
     ):
         """
         Initialize Alert Triage Agent.
@@ -254,15 +266,29 @@ class AlertTriageAgent:
         Args:
             project_endpoint: Azure AI Foundry project endpoint
             model_deployment_name: Model deployment name
+            search_endpoint: Azure AI Search endpoint for MITRE lookups
             agent_version: Version of the agent
         """
         self.agent_version = agent_version
         self.agent_name = "AlertTriageAgent"
         self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
         self.model_deployment_name = model_deployment_name or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
+        self.search_endpoint = search_endpoint or os.getenv("AZURE_SEARCH_ENDPOINT")
+        
+        # Setup search credential if endpoint provided
+        search_credential = None
+        if self.search_endpoint:
+            search_key = os.getenv("AZURE_SEARCH_API_KEY")
+            if search_key:
+                search_credential = AzureKeyCredential(search_key)
+            else:
+                search_credential = DefaultAzureCredential()
         
         # Initialize tools
-        self.tools = AlertTriageTools()
+        self.tools = AlertTriageTools(
+            search_endpoint=self.search_endpoint,
+            search_credential=search_credential
+        )
         self.audit_service = get_audit_service()
         
         # Agent will be created on demand
@@ -271,6 +297,10 @@ class AlertTriageAgent:
         self._project_client = None
         
         logger.debug(f"{self.agent_name} initialized (version: {agent_version})")
+        if self.search_endpoint:
+            logger.debug(f"  AI Search enabled: {self.search_endpoint}")
+        else:
+            logger.debug("  AI Search not configured - using mock MITRE data")
     
     async def _get_agent(self) -> ChatAgent:
         """Get or create the agent instance."""
@@ -541,6 +571,20 @@ Please:
             
             counter("alerts_triage_failed_total").inc()
             raise
+    
+    async def enrich_with_mitre_context(self, technique_ids: List[str]) -> Dict[str, Any]:
+        """
+        Enrich alert with MITRE ATT&CK context from AI Search.
+        
+        This method provides direct access to AI Search MITRE lookups outside of the agent workflow.
+        
+        Args:
+            technique_ids: List of MITRE technique IDs
+            
+        Returns:
+            Dict with technique information from AI Search or mock data
+        """
+        return await self.tools.get_mitre_context_from_search(technique_ids)
     
     async def close(self):
         """Clean up resources."""
