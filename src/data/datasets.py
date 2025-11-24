@@ -170,59 +170,123 @@ class AttackDatasetLoader:
         self._scenarios: List[Dict[str, Any]] = []
         logger.debug(f"Attack dataset loader initialized with path: {data_path}")
     
-    def load_scenarios(self, technique_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def load_scenarios(self, technique_id: Optional[str] = None, use_mock: bool = False, max_scenarios: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Load attack scenarios from Attack dataset.
         
         Args:
             technique_id: Filter by MITRE ATT&CK technique ID
+            use_mock: If True, return mock scenarios instead of loading from CSV
+            max_scenarios: Maximum number of scenarios to load (None = all)
         
         Returns:
             List[Dict]: List of attack scenarios
-        
-        Note:
-            For MVP, returns mock scenarios. Production would read from
-            actual Attack dataset files.
         """
-        # Mock attack scenarios with MITRE mappings
-        scenarios = [
-            {
-                "scenario_id": "ATK-001",
-                "name": "PowerShell Credential Theft",
-                "technique": "T1059.001",
-                "tactic": "Execution",
-                "description": "Adversary uses PowerShell to steal credentials",
-                "indicators": ["powershell.exe", "mimikatz", "credential dump"],
-                "severity": "high"
-            },
-            {
-                "scenario_id": "ATK-002",
-                "name": "Brute Force SSH",
-                "technique": "T1110.001",
-                "tactic": "Credential Access",
-                "description": "Multiple failed SSH login attempts",
-                "indicators": ["ssh", "failed login", "multiple attempts"],
-                "severity": "medium"
-            },
-            {
-                "scenario_id": "ATK-003",
-                "name": "Ransomware File Encryption",
-                "technique": "T1486",
-                "tactic": "Impact",
-                "description": "Mass file encryption indicating ransomware",
-                "indicators": ["file encryption", "ransom note", "mass file modification"],
-                "severity": "critical"
-            },
-            {
-                "scenario_id": "ATK-004",
-                "name": "Lateral Movement via SMB",
-                "technique": "T1021.002",
-                "tactic": "Lateral Movement",
-                "description": "SMB connections to multiple hosts",
-                "indicators": ["smb", "network share", "multiple hosts"],
-                "severity": "high"
-            }
-        ]
+        if use_mock:
+            # Mock attack scenarios with MITRE mappings
+            scenarios = [
+                {
+                    "scenario_id": "ATK-001",
+                    "name": "PowerShell Credential Theft",
+                    "technique": "T1059.001",
+                    "tactic": "Execution",
+                    "description": "Adversary uses PowerShell to steal credentials",
+                    "indicators": ["powershell.exe", "mimikatz", "credential dump"],
+                    "severity": "high"
+                },
+                {
+                    "scenario_id": "ATK-002",
+                    "name": "Brute Force SSH",
+                    "technique": "T1110.001",
+                    "tactic": "Credential Access",
+                    "description": "Multiple failed SSH login attempts",
+                    "indicators": ["ssh", "failed login", "multiple attempts"],
+                    "severity": "medium"
+                },
+                {
+                    "scenario_id": "ATK-003",
+                    "name": "Ransomware File Encryption",
+                    "technique": "T1486",
+                    "tactic": "Impact",
+                    "description": "Mass file encryption indicating ransomware",
+                    "indicators": ["file encryption", "ransom note", "mass file modification"],
+                    "severity": "critical"
+                },
+                {
+                    "scenario_id": "ATK-004",
+                    "name": "Lateral Movement via SMB",
+                    "technique": "T1021.002",
+                    "tactic": "Lateral Movement",
+                    "description": "SMB connections to multiple hosts",
+                    "indicators": ["smb", "network share", "multiple hosts"],
+                    "severity": "high"
+                }
+            ]
+        else:
+            # Load from CSV file
+            import csv
+            csv_path = self.data_path / "Attack_Dataset.csv"
+            
+            if not csv_path.exists():
+                logger.warning(f"Attack dataset CSV not found at {csv_path}, falling back to mock data")
+                return self.load_scenarios(technique_id=technique_id, use_mock=True, max_scenarios=max_scenarios)
+            
+            scenarios = []
+            try:
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for idx, row in enumerate(reader, 1):
+                        # Extract MITRE technique (first one if multiple)
+                        mitre_technique = row.get('MITRE Technique', '').strip()
+                        techniques = [t.strip() for t in mitre_technique.split(',') if t.strip()]
+                        primary_technique = techniques[0] if techniques else 'Unknown'
+                        
+                        # Map severity from impact field
+                        impact = row.get('Impact', '').lower()
+                        if 'critical' in impact or 'complete' in impact or 'full' in impact:
+                            severity = 'critical'
+                        elif 'high' in impact or 'major' in impact or 'significant' in impact:
+                            severity = 'high'
+                        elif 'medium' in impact or 'moderate' in impact:
+                            severity = 'medium'
+                        else:
+                            severity = 'low'
+                        
+                        # Extract tactic from category or attack type
+                        category = row.get('Category', '').strip()
+                        attack_type = row.get('Attack Type', '').strip()
+                        tactic = category if category else attack_type
+                        
+                        # Extract indicators from tools and detection fields
+                        tools = row.get('Tools Used', '').strip()
+                        detection = row.get('Detection Method', '').strip()
+                        indicators = []
+                        if tools:
+                            indicators.extend([t.strip() for t in tools.split(',') if t.strip()])
+                        if detection:
+                            indicators.extend([d.strip() for d in detection.split(',') if d.strip()])
+                        
+                        scenario = {
+                            "scenario_id": f"ATK-{idx:05d}",
+                            "name": row.get('Title', f'Attack Scenario {idx}').strip(),
+                            "technique": primary_technique,
+                            "tactic": tactic,
+                            "description": row.get('Scenario Description', '').strip() or row.get('Title', '').strip(),
+                            "indicators": indicators[:10],  # Limit to first 10 indicators
+                            "severity": severity,
+                            "attack_type": attack_type,
+                            "vulnerability": row.get('Vulnerability', '').strip(),
+                            "target_type": row.get('Target Type', '').strip(),
+                        }
+                        scenarios.append(scenario)
+                        
+                        if max_scenarios and len(scenarios) >= max_scenarios:
+                            break
+                            
+            except Exception as e:
+                logger.error(f"Error loading Attack dataset CSV: {e}")
+                logger.warning("Falling back to mock data")
+                return self.load_scenarios(technique_id=technique_id, use_mock=True, max_scenarios=max_scenarios)
         
         if technique_id:
             scenarios = [s for s in scenarios if s["technique"] == technique_id]

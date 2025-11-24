@@ -24,7 +24,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -37,6 +37,7 @@ from azure.search.documents.indexes.models import (
     SearchIndex,
     SimpleField,
     SearchableField,
+    SearchField,
     SearchFieldDataType,
     VectorSearch,
     HnswAlgorithmConfiguration,
@@ -76,15 +77,19 @@ class AISearchSetup:
                 type=SearchFieldDataType.String,
                 searchable=True,
             ),
-            SimpleField(
+            SearchField(
                 name="mitre_techniques",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.String),
+                searchable=True,
                 filterable=True,
+                facetable=True,
             ),
-            SimpleField(
+            SearchField(
                 name="mitre_tactics",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.String),
+                searchable=True,
                 filterable=True,
+                facetable=True,
             ),
             SimpleField(
                 name="severity",
@@ -208,14 +213,20 @@ class AISearchSetup:
             logger.error(f"❌ Failed to create threat-intelligence index: {e}")
             raise
 
-    async def load_attack_data(self) -> None:
-        """Load Attack dataset into attack-scenarios index"""
-        logger.info("Loading Attack dataset into attack-scenarios index...")
+    async def load_attack_data(self, use_mock: bool = False, max_scenarios: Optional[int] = None) -> None:
+        """
+        Load Attack dataset into attack-scenarios index.
+        
+        Args:
+            use_mock: If True, load only 4 mock scenarios. If False, load from CSV file.
+            max_scenarios: Maximum number of scenarios to load (None = all)
+        """
+        logger.info(f"Loading Attack dataset into attack-scenarios index (mock={use_mock}, max={max_scenarios or 'all'})...")
 
         try:
             # Load Attack dataset
             loader = AttackDatasetLoader()
-            scenarios = loader.load_scenarios()
+            scenarios = loader.load_scenarios(use_mock=use_mock, max_scenarios=max_scenarios)
             
             if not scenarios:
                 logger.warning("No scenarios loaded from Attack dataset")
@@ -268,8 +279,14 @@ class AISearchSetup:
             logger.error(f"❌ Failed to load Attack dataset: {e}")
             raise
 
-    async def setup_all(self) -> None:
-        """Create all indexes and load data"""
+    async def setup_all(self, use_mock_attack_data: bool = False, max_attack_scenarios: Optional[int] = None) -> None:
+        """
+        Create all indexes and load data.
+        
+        Args:
+            use_mock_attack_data: If True, load only 4 mock scenarios. If False, load from CSV.
+            max_attack_scenarios: Maximum number of attack scenarios to load (None = all)
+        """
         try:
             logger.info("Starting Azure AI Search setup...")
 
@@ -279,7 +296,7 @@ class AISearchSetup:
             await self.create_threat_intelligence_index()
 
             # Load data
-            await self.load_attack_data()
+            await self.load_attack_data(use_mock=use_mock_attack_data, max_scenarios=max_attack_scenarios)
 
             logger.info("✅ Azure AI Search setup complete!")
 
@@ -308,6 +325,17 @@ async def main():
         action="store_true",
         help="Use Azure Managed Identity instead of API key",
     )
+    parser.add_argument(
+        "--use-mock-data",
+        action="store_true",
+        help="Load only 4 mock attack scenarios instead of full CSV dataset",
+    )
+    parser.add_argument(
+        "--max-scenarios",
+        type=int,
+        help="Maximum number of attack scenarios to load from CSV (default: all)",
+        default=None,
+    )
 
     args = parser.parse_args()
 
@@ -330,7 +358,10 @@ async def main():
 
     # Run setup
     setup = AISearchSetup(endpoint=args.endpoint, credential=credential)
-    await setup.setup_all()
+    await setup.setup_all(
+        use_mock_attack_data=args.use_mock_data,
+        max_attack_scenarios=args.max_scenarios
+    )
 
 
 if __name__ == "__main__":
