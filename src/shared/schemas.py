@@ -199,7 +199,7 @@ class SecurityIncident(BaseModel):
     Classification: Optional[IncidentClassification] = None
     ClassificationReason: Optional[str] = None
     ClassificationComment: Optional[str] = None
-    Owner: IncidentOwner = Field(default_factory=IncidentOwner)
+    OwnerInfo: IncidentOwner = Field(default_factory=IncidentOwner)
     CreatedTime: datetime = Field(default_factory=datetime.utcnow)
     FirstActivityTime: Optional[datetime] = None
     LastActivityTime: Optional[datetime] = None
@@ -278,7 +278,7 @@ class HuntingQuery(BaseModel):
 
 class ResponseTargetEntity(BaseModel):
     """Target entity for a response action."""
-    EntityType: EntityType
+    Type: EntityType
     EntityId: str
     EntityName: str
 
@@ -295,9 +295,9 @@ class ResponseAction(BaseModel):
     """Containment/response action."""
     ActionId: UUID = Field(default_factory=uuid4)
     IncidentId: UUID
-    ActionType: "ActionType"
+    Type: ActionType
     TargetEntity: ResponseTargetEntity
-    Status: "ActionStatus" = Field(default_factory=lambda: ActionStatus.PENDING)
+    Status: ActionStatus = Field(default_factory=lambda: ActionStatus.PENDING)
     RequestedBy: str
     RequestedTime: datetime = Field(default_factory=datetime.utcnow)
     ApprovedBy: Optional[str] = None
@@ -308,7 +308,7 @@ class ResponseAction(BaseModel):
     RequiresApproval: bool
     Rationale: str
     PlaybookId: Optional[UUID] = None
-    ExecutionDetails: ExecutionDetails = Field(default_factory=ExecutionDetails)
+    Execution: ExecutionDetails = Field(default_factory=ExecutionDetails)
 
 
 class KeyThreat(BaseModel):
@@ -411,11 +411,11 @@ class AgentState(BaseModel):
     AgentVersion: str
     Status: AgentStatusEnum = Field(default=AgentStatusEnum.IDLE)
     LastHeartbeat: datetime = Field(default_factory=datetime.utcnow)
-    ProcessingQueue: ProcessingQueue = Field(default_factory=ProcessingQueue)
-    Metrics: AgentMetrics = Field(default_factory=AgentMetrics)
-    Configuration: AgentConfiguration
+    Queue: ProcessingQueue = Field(default_factory=ProcessingQueue)
+    PerformanceMetrics: AgentMetrics = Field(default_factory=AgentMetrics)
+    Config: AgentConfiguration
     LastModelUpdate: Optional[datetime] = None
-    FeedbackSummary: FeedbackSummary = Field(default_factory=FeedbackSummary)
+    Feedback: FeedbackSummary = Field(default_factory=FeedbackSummary)
 
 
 # ============================================================================
