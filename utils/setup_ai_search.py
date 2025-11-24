@@ -45,9 +45,11 @@ from azure.search.documents.indexes.models import (
 
 from src.data.datasets import AttackDatasetLoader
 from src.shared.logging import get_logger
+from dotenv import load_dotenv
 
 logger = get_logger(__name__)
 
+load_dotenv()
 
 class AISearchSetup:
     """Azure AI Search initialization and data loading"""
@@ -74,16 +76,14 @@ class AISearchSetup:
                 type=SearchFieldDataType.String,
                 searchable=True,
             ),
-            SearchableField(
+            SimpleField(
                 name="mitre_techniques",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.String),
-                searchable=True,
                 filterable=True,
             ),
-            SearchableField(
+            SimpleField(
                 name="mitre_tactics",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.String),
-                searchable=True,
                 filterable=True,
             ),
             SimpleField(
@@ -224,15 +224,23 @@ class AISearchSetup:
             # Transform to search documents
             documents = []
             for scenario in scenarios:
+                # Ensure indicators is a flat list of strings
+                indicators = scenario.get("indicators", [])
+                if isinstance(indicators, list):
+                    # Flatten and convert to strings
+                    iocs_str = ", ".join([str(i) for i in indicators if i])
+                else:
+                    iocs_str = str(indicators) if indicators else ""
+                
                 doc = {
-                    "id": scenario["scenario_id"],
-                    "name": scenario["name"],
-                    "description": scenario["description"],
-                    "mitre_techniques": [scenario["technique"]],
-                    "mitre_tactics": [scenario["tactic"]],
-                    "severity": scenario["severity"],
-                    "iocs": ", ".join(scenario.get("indicators", [])),
-                    "attack_scenario": scenario["description"]
+                    "id": str(scenario["scenario_id"]),
+                    "name": str(scenario["name"]),
+                    "description": str(scenario["description"]),
+                    "mitre_techniques": [str(scenario["technique"])],
+                    "mitre_tactics": [str(scenario["tactic"])],
+                    "severity": str(scenario["severity"]),
+                    "iocs": iocs_str,
+                    "attack_scenario": str(scenario["description"])
                 }
                 documents.append(doc)
             
@@ -245,12 +253,16 @@ class AISearchSetup:
             
             async with search_client:
                 result = await search_client.upload_documents(documents=documents)
-                logger.info(f"✅ Uploaded {len(documents)} attack scenarios to AI Search")
                 
-                # Check for any failures
+                successful = sum(1 for r in result if r.succeeded)
                 failed = [r for r in result if not r.succeeded]
+                
+                logger.info(f"✅ Uploaded {successful}/{len(documents)} attack scenarios to AI Search")
+                
                 if failed:
                     logger.warning(f"⚠️  {len(failed)} documents failed to upload")
+                    for r in failed:
+                        logger.error(f"Failed document key={r.key}: {r.error_message}")
                 
         except Exception as e:
             logger.error(f"❌ Failed to load Attack dataset: {e}")
@@ -289,7 +301,7 @@ async def main():
     parser.add_argument(
         "--key",
         help="Azure AI Search API key (or use Managed Identity)",
-        default=os.getenv("AZURE_SEARCH_API_KEY"),
+        default=os.getenv("AZURE_SEARCH_KEY") or os.getenv("AZURE_SEARCH_API_KEY"),
     )
     parser.add_argument(
         "--use-managed-identity",
@@ -306,12 +318,15 @@ async def main():
         sys.exit(1)
 
     # Setup credential
-    if args.use_managed_identity or not args.key:
+    if args.use_managed_identity:
         logger.info("Using Azure Managed Identity for authentication")
         credential = DefaultAzureCredential()
-    else:
+    elif args.key:
         logger.info("Using API key for authentication")
         credential = AzureKeyCredential(args.key)
+    else:
+        logger.error("❌ Error: Either --key or --use-managed-identity must be provided")
+        sys.exit(1)
 
     # Run setup
     setup = AISearchSetup(endpoint=args.endpoint, credential=credential)
