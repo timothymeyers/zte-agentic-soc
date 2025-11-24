@@ -207,24 +207,28 @@ class AlertTriageTools:
         logger.debug(f"[TOOL] find_correlated_alerts result: {result['correlated_count']} correlations")
         return json.dumps(result)
     
-    @ai_function(description="Record the triage decision determined through analysis of risk, correlation, and MITRE context")
-    def make_triage_decision(
-        decision: Annotated[str, Field(description="Triage decision: EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, or RequireHumanReview")],
-        priority: Annotated[str, Field(description="Priority level: Critical, High, Medium, or Low")],
-        rationale: Annotated[str, Field(description="Detailed explanation of the decision considering risk score, correlations, MITRE techniques, and threat context")]
+    @ai_function(description="Record your final triage decision after analyzing all context. You must determine the appropriate decision and priority based on risk score, correlations, MITRE scenario counts, and threat intelligence.")
+    def record_triage_decision(
+        decision: Annotated[str, Field(description="Your determined triage decision: EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, or RequireHumanReview")],
+        priority: Annotated[str, Field(description="Your determined priority level: Critical, High, Medium, or Low")],
+        rationale: Annotated[str, Field(description="Detailed explanation of YOUR decision logic, including: risk score analysis, correlation status, MITRE scenario counts, and why you chose this specific decision and priority")]
     ) -> str:
         """
-        Record the triage decision after analyzing all available context.
-        The agent should consider:
-        - Risk score and its components
-        - Correlation with recent alerts
-        - MITRE ATT&CK technique severity and prevalence
-        - Attack scenario context
-        - Entity involvement patterns
+        Record the triage decision YOU determined after analyzing all available context.
+        
+        YOU (the AI agent) are responsible for:
+        - Analyzing the risk score and its components
+        - Evaluating correlation with recent alerts
+        - Assessing MITRE ATT&CK technique scenario counts and prevalence
+        - Understanding attack scenario context
+        - Considering entity involvement patterns
+        - MAKING THE FINAL DECISION based on all evidence
+        
+        This tool simply records your decision for the system to act upon.
         
         Returns a JSON string confirming the decision.
         """
-        logger.debug(f"[TOOL] make_triage_decision called: decision={decision}, priority={priority}")
+        logger.debug(f"[TOOL] record_triage_decision called: decision={decision}, priority={priority}")
         logger.debug(f"[TOOL] Rationale: {rationale}")
         
         result = {
@@ -233,7 +237,7 @@ class AlertTriageTools:
             "rationale": rationale
         }
         
-        logger.debug(f"[TOOL] make_triage_decision result: {decision} (priority: {priority})")
+        logger.debug(f"[TOOL] record_triage_decision result: {decision} (priority: {priority})")
         return json.dumps(result)
     
     @ai_function(description="Get MITRE ATT&CK technique information from Azure AI Search")
@@ -589,16 +593,18 @@ class AlertTriageAgent:
                 os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
             
             # Build agent instructions
-            instructions = """You are an expert security analyst specializing in alert triage.
+            instructions = """You are an autonomous security analyst agent specializing in alert triage and automated response.
 
-Your role is to analyze security alerts and make intelligent triage decisions by gathering context, 
-reasoning about the threat, and providing clear recommendations.
+PRIMARY GOAL: Provide actionable remediation steps to enable automated response. Avoid human escalation except for the most critical, ambiguous scenarios.
+
+Your role is to analyze security alerts, make intelligent triage decisions, and prescribe specific next actions for automated systems or other agents to execute.
 
 Analysis Process:
 1. Check for correlated alerts to identify potential attack campaigns
 2. If MITRE ATT&CK techniques are present, retrieve detailed context about them (including attack scenario counts)
 3. Calculate the risk score using all available alert factors AND the MITRE scenario counts from step 2
 4. Synthesize all information to determine the appropriate triage decision
+5. Prescribe specific, actionable remediation steps
 
 IMPORTANT: Always call get_mitre_context BEFORE calculate_risk_score so that scenario counts can be included in risk calculation.
 
@@ -609,24 +615,57 @@ Decision Factors to Consider:
 - Entity types involved and their potential impact
 - Historical context from similar alerts
 
-Make your triage decision based on holistic analysis, not rigid thresholds. Consider:
-- Techniques with high severity or low prevalence may indicate sophisticated threats
-- Correlation across multiple entities suggests coordinated campaigns
-- Multiple MITRE techniques may indicate multi-stage attacks
-- Low-risk alerts with unusual patterns may still warrant investigation
+AUTONOMOUS RESPONSE PHILOSOPHY:
+- Human escalation (RequireHumanReview) should be LAST RESORT only for:
+  * Truly ambiguous situations requiring human judgment
+  * Critical incidents with potential business impact that need executive awareness
+  * Novel attack patterns that automation cannot handle safely
+- Prefer automated actions with clear remediation steps
+- Provide specific, executable instructions for automation systems
+
+Triage Decision Guidelines:
+
+1. MarkAsFalsePositive (Priority: Low)
+   - Use when: Clear indicators of benign activity, very low risk score, known false positive patterns
+   - Remediation: "Suppress future alerts matching this pattern. Tune detection rule to reduce noise."
+
+2. CorrelateWithExisting (Priority: Low to Medium)
+   - Use when: Isolated alert with low scenario counts (<3) OR alert needs monitoring before action
+   - Remediation examples:
+     * "Create watchlist alert monitoring <host> for 24 hours. Auto-escalate if 3+ related alerts appear."
+     * "Enable enhanced logging on <host> and <user> for 48 hours to gather additional IOCs."
+     * "Add <IP address> to monitoring list for correlation with future alerts."
+
+3. EscalateToIncident (Priority: Medium to Critical)
+   - Use when: Multiple correlations, high scenario counts (5+), high risk score, clear threat indicators
+   - Remediation examples:
+     * "Isolate <host> from network immediately. Initiate forensic data collection."
+     * "Disable user account <user> and force password reset. Review access logs for lateral movement."
+     * "Block <IP address> at firewall. Scan all hosts for similar IOCs."
+     * "Quarantine <host> and trigger full disk imaging for forensics. Alert SOC team for incident response."
+
+4. RequireHumanReview (Priority: Medium to Critical) - USE SPARINGLY
+   - Use ONLY when: Genuinely ambiguous situation, potential for significant business impact, novel/sophisticated attack requiring expert analysis
+   - Remediation: "Escalate to human analyst due to [specific reason]. Provide context: [summary of ambiguity]."
 
 Special Handling for Low-Prevalence Alerts (No Correlations + Low MITRE Scenario Counts):
 - If there are NO correlated alerts AND MITRE techniques have LOW scenario counts (< 3 scenarios per technique):
   * This suggests an isolated, uncommon alert pattern
-  * DO NOT escalate to incident immediately
-  * Instead, recommend RequireHumanReview with Medium or Low priority
-  * In your rationale, suggest: "Recommend creating monitoring alert for affected users/assets until correlation appears"
-  * NOTE: In production, this would trigger runbook automation to establish watchlist monitoring
+  * DO NOT escalate to incident or require human review immediately
+  * Use CorrelateWithExisting decision to trigger automated monitoring
+  * Set priority to Low or Medium based on severity
+  * Remediation: "Create watchlist alert monitoring affected assets [list hosts/users/IPs]. Auto-escalate to incident if correlation appears within 24 hours."
 
-Use the make_triage_decision tool to record your decision with:
+Your rationale must include:
+1. Summary of evidence (risk score, correlations, scenario counts)
+2. Decision logic and reasoning
+3. SPECIFIC remediation steps with entity names (hosts, users, IPs)
+4. Success criteria or escalation triggers
+
+Use the record_triage_decision tool to record your final decision with:
 - Decision: EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, or RequireHumanReview
 - Priority: Critical, High, Medium, or Low
-- Rationale: Detailed explanation referencing specific evidence from your analysis, including correlation status and scenario counts"""
+- Rationale: Include your decision logic AND specific remediation steps that automation can execute"""
             
             # Create agent with tools
             if self.project_endpoint:
@@ -651,7 +690,7 @@ Use the make_triage_decision tool to record your decision with:
                     tools=[
                         self.tools.calculate_risk_score,
                         self.tools.find_correlated_alerts,
-                        self.tools.make_triage_decision,
+                        self.tools.record_triage_decision,
                         self.tools.get_mitre_context
                     ]
                 )
@@ -722,8 +761,12 @@ Please:
 1. Check for correlated alerts using the find_correlated_alerts tool
 2. Get MITRE technique context if applicable using the get_mitre_context tool (note the scenario_count for each technique)
 3. Calculate the risk score using the calculate_risk_score tool, passing the scenario counts from step 2 as mitre_scenario_counts parameter
-4. Make a triage decision using the make_triage_decision tool
-5. Provide a clear explanation of your decision and recommendations"""
+4. Analyze all the data and MAKE YOUR TRIAGE DECISION based on the evidence
+5. Determine specific remediation steps (e.g., "Isolate host X", "Monitor user Y for 24h", "Block IP Z")
+6. Record your decision using the record_triage_decision tool with remediation steps in the rationale
+7. Provide a summary explaining your decision and the automated actions to be taken
+
+Remember: Avoid human escalation unless absolutely necessary. Provide actionable steps for automated response."""
             
             logger.debug(f"🤖 Sending query to AI agent ({len(query)} chars)")
             logger.debug(f"Query:\n{query}")
