@@ -156,8 +156,27 @@ GUIDE Dataset → Alert → ChatAgent (Framework) → AI Function Tools → GPT-
 ### Documentation
 
 - **[Agent Framework Implementation](docs/AGENT-FRAMEWORK-IMPLEMENTATION.md)** - Complete architecture and usage guide
+- **[Foundry Native Agents Refactor Plan](docs/FOUNDRY-NATIVE-AGENTS-REFACTOR-PLAN.md)** - ⭐ **NEW** - Migration plan to declarative YAML agents
 - **[Framework Migration Summary](docs/FRAMEWORK-MIGRATION-SUMMARY.md)** - Before/after comparison
 - **[MVP Implementation Summary](docs/MVP-IMPLEMENTATION-SUMMARY.md)** - Overall project status
+
+### Agent Definitions
+
+- **[agents/](agents/)** - Declarative YAML agent definitions for Foundry native agents
+- **[agents/alert-triage-agent.yaml](agents/alert-triage-agent.yaml)** - Alert Triage Agent definition
+- **[agents/README.md](agents/README.md)** - Agent configuration and usage guide
+
+## 🚀 Future Roadmap: Foundry Native Agents
+
+The project is planned to migrate from programmatic agent creation to **declarative YAML-based agent definitions** that leverage Microsoft Foundry native capabilities:
+
+- **Declarative Configuration**: Agents defined in version-controlled YAML files
+- **Persistent Agents**: Create once at startup, reuse across all alert processing
+- **Native Tools**: MCP tools for Foundry IQ knowledge bases, Code Interpreter, File Search, Bing Grounding
+- **Enterprise Memory**: Persistent memory across sessions backed by Cosmos DB
+- **Knowledge Integration**: Native integration with Azure AI Search knowledge bases for MITRE ATT&CK scenarios
+
+See **[Foundry Native Agents Refactor Plan](docs/FOUNDRY-NATIVE-AGENTS-REFACTOR-PLAN.md)** for complete migration strategy.
 
 ## License
 
