@@ -127,7 +127,7 @@ async def demo_agent_framework():
     
     # Load sample alerts
     logger.info("\n🔍 Loading sample alerts from GUIDE dataset...")
-    alerts = guide_loader.load_alerts(max_alerts=1)  # Start with just 1 for demo
+    alerts = guide_loader.load_alerts(max_alerts=5)  # Start with just 5 for demo
     logger.info(f"Loaded {len(alerts)} alerts\n")
     
     # Process each alert through orchestrator
