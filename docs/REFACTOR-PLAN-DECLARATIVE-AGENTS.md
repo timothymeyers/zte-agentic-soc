@@ -1,0 +1,983 @@
+# Refactoring Plan: Foundry Declarative Agents
+
+## Executive Summary
+
+This document outlines a plan to refactor the current Agentic SOC MVP implementation from programmatic agent creation to **declarative Foundry serverless agents** using native Microsoft Foundry capabilities.
+
+The goal is to leverage:
+1. **Declarative Agent YAML definitions** using `agent-framework-declarative --pre`
+2. **Foundry IQ** for MITRE ATT&CK knowledge base integration (Azure AI Search)
+3. **Enterprise Memory** (native Foundry feature) for alert correlation and context retention
+4. **No custom tools** - all reasoning handled by LLM and agent instructions
+5. **Persistent serverless agents** created at startup and reused throughout the demo
+
+### Key References
+
+- **Foundry Agent Samples**: https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+- **Foundry IQ Knowledge Retrieval**: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/knowledge-retrieval
+- **MCP Tool Documentation**: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/model-context-protocol
+- **Enterprise Memory**: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/agent-memory
+- **Declarative Agent Schema**: https://github.com/microsoft/AgentSchema
+- **Azure AI Projects SDK**: `azure-ai-projects>=2.0.0b2`
+
+---
+
+## Tool Definition Verification
+
+### Verified via Documentation Research
+
+The following tool definitions were verified through Microsoft Learn documentation and Context7 research:
+
+#### MCP Tool (for Foundry IQ / Knowledge Base)
+
+**Source**: [MCP Tool Documentation](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/model-context-protocol)
+
+The MCP tool requires:
+- `server_url`: The URL of the MCP server endpoint
+- `server_label`: A unique identifier for the MCP server within the agent
+- `allowed_tools` (optional): List of specific tools the agent can access
+- Headers are passed at runtime via `tool_resources` for authentication
+
+**Verified format**:
+```yaml
+tools:
+  - type: mcp
+    server_label: <unique-identifier>
+    server_url: https://<endpoint>/knowledgebases/<index>/mcp?api-version=2025-11-01-Preview
+    project_connection_id: <connection-id>  # Optional, for Foundry-managed connections
+```
+
+#### Enterprise Memory (memory_search)
+
+**Source**: [Memory in Foundry Agent Service](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/agent-memory)
+
+Memory stores are created via `memory_stores.create()` API. The declarative tool definition uses:
+- `memory_store_name`: Name of the memory store (created in Foundry)
+- `scope`: Partitions memory by user/group (e.g., `defaultUser`)
+- `update_delay`: Delay before triggering memory updates
+
+**Verified format**:
+```yaml
+tools:
+  - type: memory_search
+    memory_store_name: <foundry-generated-name>
+    scope: defaultUser
+    update_delay: 30
+```
+
+**Note**: Memory stores require:
+- A chat model deployment (e.g., `gpt-4.1`) for memory processing
+- An embedding model deployment (e.g., `text-embedding-3-small`) for semantic search
+
+#### Env.<variable> Pattern
+
+**Source**: [AgentFactory in agent-framework-declarative](https://github.com/microsoft/agent-framework/issues/25)
+
+The `Env.<variable>` pattern is specific to `agent-framework-declarative`'s AgentFactory, which resolves environment variables at agent construction time. This differs from shell-style `${VAR}` syntax.
+
+---
+
+## Environment Variables
+
+The following environment variables are required for implementation and testing:
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | `12345678-1234-1234-1234-123456789abc` |
+| `AZURE_RESOURCE_GROUP` | Resource group hosting the AI project | `rg-agentic-soc` |
+| `AZURE_LOCATION` | Azure region (must support Foundry) | `eastus2` |
+| `AZURE_AI_ACCOUNT_NAME` | Microsoft Foundry account (hub) name | `foundry-account` |
+| `AZURE_AI_PROJECT_NAME` | Project hosting the agent | `agentic-soc-project` |
+| `AZURE_AI_FOUNDRY_PROJECT_ENDPOINT` | Foundry project endpoint URL | `https://<account>.services.ai.azure.com/api/projects/<project>` |
+
+### Model Deployment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint | `https://<resource>.openai.azure.com/` |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | Model deployment name | `gpt-4o-mini` |
+| `AZURE_OPENAI_API_VERSION` | API version | `2024-08-01-preview` |
+
+### Foundry IQ / Knowledge Base Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_SEARCH_ENDPOINT` | Azure AI Search endpoint for Foundry IQ | `https://<resource>.search.windows.net` |
+| `AZURE_SEARCH_INDEX_NAME` | Index name for MITRE ATT&CK knowledge base | `mitre-attack-index` |
+| `FOUNDRY_IQ_MCP_URL` | MCP endpoint URL for Foundry IQ (generated by Foundry) | `https://<search>.search.windows.net/knowledgebases/<index>/mcp?api-version=2025-11-01-Preview` |
+| `FOUNDRY_IQ_CONNECTION_ID` | Foundry IQ connection ID (generated by Foundry) | `<index><random-chars>` |
+
+### Enterprise Memory Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MEMORY_STORE_NAME` | Memory store name (generated by Microsoft Foundry) | `<generated-name>` |
+
+### Optional Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_CLIENT_ID` | Service principal client ID (if not using CLI auth) | `<client-id>` |
+| `AZURE_CLIENT_SECRET` | Service principal secret | `<secret>` |
+| `AZURE_TENANT_ID` | Azure AD tenant ID | `<tenant-id>` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+| `AGENT_NAME` | Name for the triage agent | `alert-triage-agent` |
+
+### Sample `.env` File
+
+```bash
+# Azure Subscription
+AZURE_SUBSCRIPTION_ID=12345678-1234-1234-1234-123456789abc
+AZURE_RESOURCE_GROUP=rg-agentic-soc
+AZURE_LOCATION=eastus2
+
+# Microsoft Foundry
+AZURE_AI_ACCOUNT_NAME=foundry-agentic-soc
+AZURE_AI_PROJECT_NAME=soc-agents
+AZURE_AI_FOUNDRY_PROJECT_ENDPOINT=https://foundry-agentic-soc.services.ai.azure.com/api/projects/soc-agents
+
+# Azure OpenAI
+AZURE_OPENAI_ENDPOINT=https://openai-agentic-soc.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
+
+# Foundry IQ / Azure AI Search (MITRE Knowledge Base)
+AZURE_SEARCH_ENDPOINT=https://search-agentic-soc.search.windows.net
+AZURE_SEARCH_INDEX_NAME=mitre-attack-knowledge
+FOUNDRY_IQ_MCP_URL=https://search-agentic-soc.search.windows.net/knowledgebases/mitre-attack-knowledge/mcp?api-version=2025-11-01-Preview
+FOUNDRY_IQ_CONNECTION_ID=mitre-attack-knowledge<generated-by-foundry>
+
+# Enterprise Memory (generated by Foundry)
+MEMORY_STORE_NAME=<generated-by-foundry>
+
+# Optional
+LOG_LEVEL=INFO
+AGENT_NAME=alert-triage-agent
+```
+
+---
+
+## Current State Analysis
+
+### Current Implementation
+
+The Alert Triage Agent (`src/agents/alert_triage_agent.py`) currently uses:
+
+```python
+# Current approach - Programmatic agent creation with custom tools
+from agent_framework import ChatAgent, ai_function
+from agent_framework.azure import AzureAIAgentClient
+
+class AlertTriageAgent:
+    async def _get_agent(self) -> ChatAgent:
+        self._agent = ChatAgent(
+            chat_client=AzureAIAgentClient(...),
+            instructions=instructions,
+            tools=[
+                self.tools.calculate_risk_score,       # Custom tool
+                self.tools.find_correlated_alerts,     # Custom tool
+                self.tools.record_triage_decision,     # Custom tool
+                self.tools.get_mitre_context           # Custom tool (AI Search)
+            ]
+        )
+```
+
+**Current Limitations:**
+1. Agent recreated each time application starts
+2. Custom tools tightly coupled with agent
+3. No persistent memory across sessions
+4. Manual AI Search integration for MITRE context
+5. No alert correlation memory
+
+---
+
+## Target State: Foundry Declarative Agent
+
+### Target Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              alert_triage_agent.yaml (Declarative)              │
+│                                                                  │
+│  name: alert-triage-agent                                        │
+│  model: gpt-4o-mini                                              │
+│  instructions: <comprehensive system prompt>                     │
+│  tools:                                                          │
+│    - type: foundry_iq (MITRE knowledge base)                     │
+│    - type: enterprise_memory (alert correlation)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 Foundry Agent Service (Serverless)               │
+│                                                                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Foundry IQ     │  │  Enterprise     │  │  Persistent     │  │
+│  │  (MITRE KB)     │  │  Memory         │  │  Agent          │  │
+│  │                 │  │  (Correlation)  │  │  Instance       │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                  │
+│  • Azure AI Search integration                                   │
+│  • Cosmos DB for memory                                          │
+│  • Auto-scaling, managed infrastructure                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Python Application                            │
+│                                                                  │
+│  # One-time agent creation at startup                            │
+│  agent = await foundry_client.create_agent_from_yaml(            │
+│      "alert_triage_agent.yaml"                                   │
+│  )                                                               │
+│                                                                  │
+│  # Reuse agent throughout demo session                           │
+│  result = await agent.run(alert_data)                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Benefits
+
+| Aspect | Current | Target |
+|--------|---------|--------|
+| **Agent Definition** | Python code | YAML file |
+| **Custom Tools** | 4 custom `@ai_function` tools | None (LLM handles all) |
+| **MITRE Knowledge** | Custom AI Search code | Foundry IQ (native) |
+| **Alert Correlation** | In-memory list | Enterprise Memory (persistent) |
+| **Agent Lifecycle** | Created per request | Persistent, reused |
+| **Configuration** | Code changes | YAML edit |
+| **Infrastructure** | Self-managed | Foundry serverless |
+
+---
+
+## Detailed Refactoring Plan
+
+### Phase 1: Dependencies Update
+
+**Objective:** Update to Foundry-compatible SDK versions
+
+**Tasks:**
+
+1. **Update `requirements.txt`**
+   ```diff
+   # Agent Framework with declarative support
+   - agent-framework
+   - agent-framework-azure-ai
+   + agent-framework-declarative --pre
+   + agent-framework-azure-ai --pre
+   
+   # Azure AI Projects SDK v2 for Foundry features
+   - azure-ai-projects>=1.0.0
+   + azure-ai-projects>=2.0.0b2
+   
+   # Keep existing
+   azure-identity>=1.15.0
+   azure-ai-inference>=1.0.0b9
+   ```
+
+2. **Install Packages**
+   ```bash
+   pip install agent-framework-declarative --pre
+   pip install --pre azure-ai-projects>=2.0.0b2
+   ```
+
+**Estimated Effort:** 0.5 days
+
+---
+
+### Phase 2: Create Declarative Agent YAML
+
+**Objective:** Define Alert Triage Agent as a declarative YAML file
+
+**Reference:** https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+
+**Tasks:**
+
+1. **Create Agent YAML Definition**
+
+   Create file: `src/agents/definitions/alert_triage_agent.yaml`
+
+   ```yaml
+   # Alert Triage Agent - Foundry Declarative Definition
+   # Reference: https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+   # Note: Environment variables use the Env.<variable> pattern per agent-framework-declarative
+   
+   name: alert-triage-agent
+   description: AI-powered security alert triage agent for SOC operations
+   
+   model:
+     deployment: Env.AZURE_OPENAI_DEPLOYMENT_NAME
+     parameters:
+       temperature: 0.3
+       max_tokens: 4096
+   
+   instructions: |
+     You are an autonomous security analyst agent specializing in alert triage.
+     
+     ## Your Role
+     Analyze security alerts, assess risk, identify patterns, and make triage decisions.
+     All reasoning and analysis is handled by you - no external tools are needed for 
+     risk calculation, correlation analysis, or decision making.
+     
+     ## Available Capabilities
+     1. **MITRE ATT&CK Knowledge**: Use Foundry IQ to search the MITRE ATT&CK knowledge
+        base for technique context, tactics, and threat intelligence.
+     2. **Enterprise Memory**: Access historical alert data and correlation patterns
+        from previous triage sessions to identify related activity.
+     
+     ## Analysis Process
+     For each alert:
+     1. **Understand the Alert**: Parse alert details (name, type, severity, entities)
+     2. **MITRE Context**: Query knowledge base for relevant ATT&CK techniques
+     3. **Historical Correlation**: Check enterprise memory for related past alerts
+     4. **Risk Assessment**: Based on severity, entities, MITRE techniques, and correlations:
+        - Calculate risk score (0-100)
+        - Consider asset criticality
+        - Factor in attack chain potential
+     5. **Triage Decision**: Make one of these decisions:
+        - **EscalateToIncident**: High risk, critical threat, requires immediate action
+        - **CorrelateWithExisting**: Moderate risk, part of ongoing investigation
+        - **MarkAsFalsePositive**: Clear benign activity, no threat
+        - **RequireHumanReview**: Ambiguous, needs analyst judgment (use sparingly)
+     6. **Remediation Steps**: Prescribe specific, actionable next steps
+     
+     ## Response Format
+     Provide structured analysis with:
+     - Risk Score (0-100) with explanation
+     - Triage Decision with rationale
+     - Correlated alerts (if any) from memory
+     - Recommended remediation actions
+     
+     ## Guidelines
+     - Be decisive - avoid unnecessary escalation to human review
+     - Use enterprise memory to identify attack campaigns
+     - Cite MITRE techniques when relevant
+     - Provide actionable remediation steps
+   
+   tools:
+     # Foundry IQ - MITRE ATT&CK Knowledge Base (via MCP)
+     # Verified: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/model-context-protocol
+     # Note: server_label and project_connection_id are generated by Foundry
+     - type: mcp
+       server_label: Env.AZURE_SEARCH_INDEX_NAME  # e.g., mitre-attack-index<random>
+       server_url: Env.FOUNDRY_IQ_MCP_URL  # https://<search-endpoint>/knowledgebases/<index>/mcp?api-version=2025-11-01-Preview
+       project_connection_id: Env.FOUNDRY_IQ_CONNECTION_ID  # Generated by Foundry
+     
+     # Enterprise Memory - Alert Correlation
+     # Verified: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/agent-memory
+     - type: memory_search
+       memory_store_name: Env.MEMORY_STORE_NAME  # Generated by Microsoft Foundry
+       scope: defaultUser
+       update_delay: 30
+   
+   metadata:
+     version: "2.0.0"
+     author: "SOC Team"
+     tags:
+       - security
+       - soc
+       - alert-triage
+       - foundry
+   ```
+
+**Estimated Effort:** 1 day
+
+---
+
+### Phase 3: Foundry IQ Setup (MITRE Knowledge Base)
+
+**Objective:** Configure Foundry IQ with MITRE ATT&CK knowledge base
+
+**Reference:** https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/knowledge-retrieval
+
+**Tasks:**
+
+1. **Create Azure AI Search Index for MITRE ATT&CK**
+   - Index MITRE techniques, tactics, and procedures
+   - Configure semantic search and vector embeddings
+   - Enable hybrid retrieval (keyword + vector)
+
+2. **Configure Foundry IQ Connection**
+   ```python
+   from azure.ai.projects import AIProjectClient
+   from azure.identity import DefaultAzureCredential
+   
+   # Connect Foundry IQ to AI Search index
+   project_client = AIProjectClient(
+       endpoint=os.environ["AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"],
+       credential=DefaultAzureCredential()
+   )
+   
+   # Configure knowledge base tool
+   knowledge_base = project_client.knowledge_bases.create(
+       name="mitre-attack-kb",
+       index_name=os.environ["AZURE_SEARCH_INDEX_NAME"],
+       search_endpoint=os.environ["AZURE_SEARCH_ENDPOINT"]
+   )
+   ```
+
+3. **Upload MITRE ATT&CK Data**
+   - Use existing `attack_scenarios.json` data
+   - Index techniques, tactics, mitigations
+   - Configure reranking for relevance
+
+**Estimated Effort:** 1.5 days
+
+---
+
+### Phase 4: Enterprise Memory Setup
+
+**Objective:** Configure Enterprise Memory for alert correlation (managed by Microsoft Foundry)
+
+**Reference:** https://learn.microsoft.com/en-us/agent-framework/user-guide/agents/agent-memory
+
+**Tasks:**
+
+1. **Create Memory Store in Foundry Portal**
+   - Memory store is managed by Microsoft Foundry
+   - Created via Foundry portal or API
+   - Store name is auto-generated (use `MEMORY_STORE_NAME` env variable)
+
+2. **Configure in Agent YAML**
+   ```yaml
+   tools:
+     - type: memory_search
+       memory_store_name: Env.MEMORY_STORE_NAME
+       scope: defaultUser
+       update_delay: 30
+   ```
+
+3. **Memory Store Capabilities**
+   - Agent automatically reads/writes to memory
+   - Correlation queries based on entity overlap
+   - Session persistence across demo
+   - Managed by Foundry (no Cosmos DB setup required)
+
+**Estimated Effort:** 0.5 days (mostly configuration in Foundry portal)
+
+---
+
+### Phase 5: Implement Agent Loader Using AgentFactory
+
+**Objective:** Use `agent-framework-declarative` AgentFactory to load and run declarative agent from YAML
+
+**Reference:** https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+
+**Tasks:**
+
+1. **Create Foundry Agent Loader using AgentFactory**
+
+   Create file: `src/agents/foundry_agent_loader.py`
+
+   ```python
+   """
+   Foundry Declarative Agent Loader using AgentFactory.
+   
+   Uses agent-framework-declarative's AgentFactory to load agents from YAML.
+   Reference: https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+   """
+   
+   import os
+   from pathlib import Path
+   from typing import Optional
+   
+   from agent_framework.declarative import AgentFactory
+   from azure.ai.projects import AIProjectClient
+   from azure.identity import DefaultAzureCredential
+   
+   from src.shared.logging import get_logger
+   
+   logger = get_logger(__name__)
+   
+   
+   class FoundryAgentLoader:
+       """Loads and manages Foundry declarative agents using AgentFactory."""
+       
+       def __init__(
+           self,
+           project_endpoint: Optional[str] = None,
+           definitions_dir: str = "src/agents/definitions"
+       ):
+           self.project_endpoint = project_endpoint or os.getenv(
+               "AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"
+           )
+           self.definitions_dir = Path(definitions_dir)
+           self._client = None
+           self._agent = None
+           self._agent_factory = None
+       
+       @property
+       def client(self) -> AIProjectClient:
+           """Get or create Foundry project client."""
+           if self._client is None:
+               self._client = AIProjectClient(
+                   endpoint=self.project_endpoint,
+                   credential=DefaultAzureCredential()
+               )
+               logger.info(f"Connected to Foundry: {self.project_endpoint}")
+           return self._client
+       
+       @property
+       def agent_factory(self) -> AgentFactory:
+           """Get or create AgentFactory instance."""
+           if self._agent_factory is None:
+               self._agent_factory = AgentFactory(
+                   project_client=self.client
+               )
+               logger.info("AgentFactory initialized")
+           return self._agent_factory
+       
+       async def create_agent(
+           self,
+           yaml_file: str = "alert_triage_agent.yaml",
+           force_recreate: bool = False
+       ):
+           """
+           Create agent from YAML definition using AgentFactory.
+           
+           AgentFactory handles:
+           - YAML parsing with Env.<variable> pattern
+           - Tool configuration (MCP, memory_search)
+           - Agent creation in Foundry
+           
+           Agent is created once and reused throughout the session.
+           """
+           if self._agent is not None and not force_recreate:
+               logger.info("Reusing existing agent instance")
+               return self._agent
+           
+           yaml_path = self.definitions_dir / yaml_file
+           logger.info(f"Loading agent from YAML: {yaml_path}")
+           
+           # AgentFactory.create_agent() handles:
+           # - Loading YAML definition
+           # - Resolving Env.<variable> references
+           # - Configuring MCP tools (Foundry IQ)
+           # - Configuring memory_search tools (Enterprise Memory)
+           # - Creating agent in Foundry
+           self._agent = await self.agent_factory.create_agent(
+               yaml_path=str(yaml_path)
+           )
+           
+           logger.info(f"✅ Agent created via AgentFactory: {self._agent.id}")
+           return self._agent
+       
+       async def run(self, input_text: str, thread_id: Optional[str] = None):
+           """Run agent with input."""
+           if self._agent is None:
+               await self.create_agent()
+           
+           # Create or reuse thread
+           if thread_id:
+               thread = await self.client.threads.get(thread_id)
+           else:
+               thread = await self.client.threads.create()
+           
+           # Add message and run
+           await self.client.messages.create(
+               thread_id=thread.id,
+               role="user",
+               content=input_text
+           )
+           
+           run = await self.client.runs.create_and_process(
+               thread_id=thread.id,
+               agent_id=self._agent.id
+           )
+           
+           # Get response
+           messages = await self.client.messages.list(thread_id=thread.id)
+           return messages[-1].content
+       
+       async def cleanup(self):
+           """Clean up agent resources."""
+           if self._agent:
+               await self.client.agents.delete(self._agent.id)
+               logger.info(f"Deleted agent: {self._agent.id}")
+               self._agent = None
+   ```
+
+2. **Create Updated Alert Triage Agent**
+
+   Create file: `src/agents/alert_triage_agent_v2.py`
+
+   ```python
+   """
+   Alert Triage Agent V2 - Foundry Declarative Implementation.
+   
+   Uses declarative YAML definition with Foundry IQ and Enterprise Memory.
+   No custom tools - all reasoning handled by LLM.
+   """
+   
+   import time
+   from typing import Optional
+   from uuid import uuid4
+   from datetime import datetime
+   
+   from src.agents.foundry_agent_loader import FoundryAgentLoader
+   from src.shared.schemas import SecurityAlert, TriageResult, TriagePriority, TriageDecision
+   from src.shared.logging import get_logger
+   from src.shared.metrics import counter
+   from src.shared.audit import get_audit_service, AuditResult
+   
+   logger = get_logger(__name__)
+   
+   
+   class AlertTriageAgentV2:
+       """
+       Alert Triage Agent using Foundry declarative approach.
+       
+       Key differences from V1:
+       - No custom @ai_function tools
+       - Foundry IQ for MITRE knowledge
+       - Enterprise Memory for correlation
+       - Agent loaded once, reused for session
+       """
+       
+       AGENT_VERSION = "2.0.0-foundry"
+       YAML_FILE = "alert_triage_agent.yaml"
+       
+       def __init__(self):
+           self._loader = FoundryAgentLoader()
+           self._thread_id: Optional[str] = None
+           self.audit_service = get_audit_service()
+       
+       async def initialize(self) -> None:
+           """Initialize agent from YAML (one-time at startup)."""
+           logger.info("Initializing Foundry declarative agent...")
+           await self._loader.create_agent(self.YAML_FILE)
+           logger.info(f"✅ Agent ready (v{self.AGENT_VERSION})")
+       
+       async def triage_alert(self, alert: SecurityAlert) -> TriageResult:
+           """
+           Triage a security alert.
+           
+           All reasoning is handled by the LLM with:
+           - Foundry IQ for MITRE context
+           - Enterprise Memory for correlation
+           """
+           start_time = time.time()
+           
+           # Build alert context for the agent
+           alert_context = self._format_alert(alert)
+           
+           # Run agent (uses Foundry IQ and Enterprise Memory internally)
+           response = await self._loader.run(
+               input_text=alert_context,
+               thread_id=self._thread_id
+           )
+           
+           # Parse structured response
+           triage_result = self._parse_response(response, alert, start_time)
+           
+           # Audit log
+           await self.audit_service.log_agent_action(
+               agent_name="AlertTriageAgentV2",
+               action="TriagedAlert",
+               target_entity_type="SecurityAlert",
+               target_entity_id=str(alert.SystemAlertId),
+               result=AuditResult.SUCCESS,
+               details={
+                   "version": self.AGENT_VERSION,
+                   "foundry_native": True,
+                   "custom_tools": False
+               }
+           )
+           
+           counter("alerts_triaged_total").inc()
+           
+           return triage_result
+       
+       def _format_alert(self, alert: SecurityAlert) -> str:
+           """Format alert for agent input."""
+           entities = []
+           for entity in alert.Entities:
+               props = entity.Properties
+               if "HostName" in props:
+                   entities.append(f"Host: {props['HostName']}")
+               if "UserName" in props:
+                   entities.append(f"User: {props['UserName']}")
+               if "IPAddress" in props:
+                   entities.append(f"IP: {props['IPAddress']}")
+           
+           mitre = alert.ExtendedProperties.get("MitreTechniques", [])
+           
+           return f"""
+   Analyze and triage this security alert:
+
+   **Alert Name**: {alert.AlertName}
+   **Alert Type**: {alert.AlertType}
+   **Severity**: {alert.Severity}
+   **Description**: {alert.Description}
+   **Confidence**: {alert.ExtendedProperties.get('ConfidenceScore', 75)}%
+
+   **Entities**:
+   {chr(10).join(f'- {e}' for e in entities) if entities else '- None identified'}
+
+   **MITRE Techniques**: {', '.join(mitre) if mitre else 'None tagged'}
+
+   Please:
+   1. Query the MITRE knowledge base for technique context
+   2. Check enterprise memory for correlated alerts
+   3. Assess risk and make a triage decision
+   4. Provide remediation recommendations
+   """
+       
+       def _parse_response(
+           self,
+           response: str,
+           alert: SecurityAlert,
+           start_time: float
+       ) -> TriageResult:
+           """Parse agent response into TriageResult."""
+           # Extract decision from response text
+           response_lower = response.lower()
+           
+           # Determine decision
+           if "escalate" in response_lower and "incident" in response_lower:
+               decision = TriageDecision.ESCALATE_TO_INCIDENT
+               priority = TriagePriority.HIGH
+           elif "correlate" in response_lower:
+               decision = TriageDecision.CORRELATE_WITH_EXISTING
+               priority = TriagePriority.MEDIUM
+           elif "false positive" in response_lower:
+               decision = TriageDecision.MARK_AS_FALSE_POSITIVE
+               priority = TriagePriority.LOW
+           else:
+               decision = TriageDecision.REQUIRE_HUMAN_REVIEW
+               priority = TriagePriority.MEDIUM
+           
+           # Extract risk score if mentioned
+           risk_score = 50  # default
+           import re
+           score_match = re.search(r'risk\s*(?:score)?[:\s]*(\d+)', response_lower)
+           if score_match:
+               risk_score = min(100, int(score_match.group(1)))
+           
+           return TriageResult(
+               AlertId=alert.SystemAlertId,
+               TriageId=uuid4(),
+               Timestamp=datetime.utcnow(),
+               RiskScore=risk_score,
+               Priority=priority,
+               TriageDecision=decision,
+               Explanation=response,
+               CorrelatedAlertIds=[],  # Populated from Enterprise Memory
+               EnrichmentData={"foundry_native": True},
+               ProcessingTimeMs=int((time.time() - start_time) * 1000),
+               AgentVersion=self.AGENT_VERSION
+           )
+       
+       async def cleanup(self):
+           """Clean up resources."""
+           await self._loader.cleanup()
+   ```
+
+**Estimated Effort:** 1.5 days
+
+---
+
+### Phase 6: Update Demo Script
+
+**Objective:** Create demo using Foundry declarative agent
+
+**Tasks:**
+
+1. **Create Demo Script**
+
+   Create file: `utils/demo_foundry_agent.py`
+
+   ```python
+   """
+   Demo: Foundry Declarative Alert Triage Agent.
+   
+   Shows agent loaded from YAML with Foundry IQ and Enterprise Memory.
+   """
+   
+   import asyncio
+   import sys
+   from pathlib import Path
+   
+   sys.path.insert(0, str(Path(__file__).parent.parent))
+   
+   from src.agents.alert_triage_agent_v2 import AlertTriageAgentV2
+   from src.data.datasets import get_guide_loader
+   from src.shared.logging import configure_logging, get_logger
+   
+   logger = get_logger(__name__)
+   
+   
+   async def demo():
+       """Run Foundry declarative agent demo."""
+       
+       print("=" * 80)
+       print("FOUNDRY DECLARATIVE ALERT TRIAGE AGENT DEMO")
+       print("=" * 80)
+       print()
+       print("Features:")
+       print("  ✓ Declarative YAML definition")
+       print("  ✓ Foundry IQ for MITRE ATT&CK knowledge")
+       print("  ✓ Enterprise Memory for alert correlation")
+       print("  ✓ No custom tools - LLM handles all reasoning")
+       print()
+       
+       # Initialize agent (one-time)
+       print("🔄 Initializing Foundry agent...")
+       agent = AlertTriageAgentV2()
+       await agent.initialize()
+       print("✅ Agent ready\n")
+       
+       # Load sample alerts
+       print("📥 Loading sample alerts...")
+       loader = get_guide_loader()
+       alerts = loader.load_alerts(max_alerts=3)
+       print(f"✅ Loaded {len(alerts)} alerts\n")
+       
+       # Process alerts (reusing same agent)
+       for i, alert in enumerate(alerts, 1):
+           print(f"{'─' * 80}")
+           print(f"📋 ALERT {i}/{len(alerts)}: {alert.AlertName}")
+           print(f"{'─' * 80}")
+           
+           result = await agent.triage_alert(alert)
+           
+           print(f"\n✅ Triage Complete:")
+           print(f"   Risk Score: {result.RiskScore}/100")
+           print(f"   Priority: {result.Priority}")
+           print(f"   Decision: {result.TriageDecision}")
+           print(f"   Time: {result.ProcessingTimeMs}ms")
+           print()
+       
+       # Cleanup
+       await agent.cleanup()
+       
+       print(f"{'=' * 80}")
+       print("✨ Demo Complete")
+       print("   • Agent loaded from YAML definition")
+       print("   • Used Foundry IQ for MITRE context")
+       print("   • Used Enterprise Memory for correlation")
+       print(f"{'=' * 80}\n")
+   
+   
+   if __name__ == "__main__":
+       configure_logging(log_level="INFO", json_output=False)
+       
+       try:
+           asyncio.run(demo())
+       except KeyboardInterrupt:
+           print("\nDemo interrupted")
+       except Exception as e:
+           logger.error(f"Demo failed: {e}", exc_info=True)
+           sys.exit(1)
+   ```
+
+**Estimated Effort:** 0.5 days
+
+---
+
+## Implementation Timeline
+
+| Phase | Description | Duration | Dependencies |
+|-------|-------------|----------|--------------|
+| 1 | Dependencies Update | 0.5 days | None |
+| 2 | Create Agent YAML | 1 day | Phase 1 |
+| 3 | Foundry IQ Setup | 1.5 days | Phase 2 |
+| 4 | Enterprise Memory | 1 day | Phase 2 |
+| 5 | Agent Loader | 1.5 days | Phases 3, 4 |
+| 6 | Demo Script | 0.5 days | Phase 5 |
+
+**Total Estimated Effort: ~6 days**
+
+---
+
+## Testing Checklist
+
+### Environment Verification
+```bash
+# Verify all required environment variables
+python -c "
+import os
+required = [
+    'AZURE_AI_FOUNDRY_PROJECT_ENDPOINT',
+    'AZURE_OPENAI_ENDPOINT',
+    'AZURE_OPENAI_DEPLOYMENT_NAME',
+    'AZURE_SEARCH_ENDPOINT',
+    'AZURE_SEARCH_INDEX_NAME',
+]
+missing = [v for v in required if not os.getenv(v)]
+if missing:
+    print(f'❌ Missing: {missing}')
+else:
+    print('✅ All required variables set')
+"
+```
+
+### Agent Loading Test
+```bash
+python -c "
+from src.agents.foundry_agent_loader import FoundryAgentLoader
+loader = FoundryAgentLoader()
+definition = loader.load_yaml('alert_triage_agent.yaml')
+print(f'✅ Loaded agent: {definition[\"name\"]}')
+"
+```
+
+### Full Demo Test
+```bash
+python utils/demo_foundry_agent.py
+```
+
+---
+
+## Success Criteria
+
+✅ **Phase 1-2:**
+- [ ] `agent-framework-declarative` installed
+- [ ] Agent YAML created and valid
+- [ ] Environment variables documented
+
+✅ **Phase 3-4:**
+- [ ] Foundry IQ connected to MITRE index
+- [ ] Enterprise Memory store created
+- [ ] Agents can query both tools
+
+✅ **Phase 5-6:**
+- [ ] Agent loads from YAML successfully
+- [ ] Demo runs end-to-end
+- [ ] Agent reused across multiple alerts
+- [ ] No custom tools needed
+
+---
+
+## Migration Notes
+
+### What's Removed
+- `@ai_function` decorated tools
+- `calculate_risk_score()` function
+- `find_correlated_alerts()` function
+- `record_triage_decision()` function
+- `get_mitre_context()` function
+- Custom AI Search integration code
+
+### What's Added
+- Foundry IQ for knowledge retrieval
+- Enterprise Memory for correlation
+- Declarative YAML agent definition
+- Simplified agent loader
+
+### Backwards Compatibility
+- Keep V1 agent code for reference
+- Feature flag to switch between V1 and V2
+- Gradual rollout during demo period
+
+---
+
+## References
+
+- **Foundry Agent Samples**: https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+- **Foundry IQ Documentation**: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/knowledge-retrieval
+- **Enterprise Memory**: https://learn.microsoft.com/en-us/agent-framework/user-guide/agents/agent-memory
+- **Azure AI Projects SDK**: https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme
+- **Declarative Agents**: https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/declarative
