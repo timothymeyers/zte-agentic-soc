@@ -1,14 +1,19 @@
-# Refactoring Plan: Microsoft Foundry Declarative Agents
+# Refactoring Plan: Declarative Agents with Microsoft Agent Framework
 
 ## Executive Summary
 
-This document outlines a plan to refactor the current Agentic SOC MVP implementation from programmatic agent creation via the Microsoft Agent Framework (`agent-framework` library) to **declarative YAML-based agent definitions** with **native Microsoft Foundry Agent Service** capabilities.
+This document outlines a plan to refactor the current Agentic SOC MVP implementation from programmatic agent creation to **declarative YAML-based agent definitions** using the **Microsoft Agent Framework's `agent-framework-declarative` package**.
 
 The goal is to leverage:
-1. **Declarative Agent YAML definitions** for agent configuration and deployment
-2. **Native Microsoft Foundry tooling** (AI Search, Enterprise Memory, File Search)
-3. **Persistent Foundry Agents** that are created once and reused across sessions
-4. **Azure AI Projects SDK v2** (`azure-ai-projects>=2.0.0b2` + `azure-ai-agents`)
+1. **`agent-framework-declarative --pre`** for YAML-based agent definitions
+2. **Declarative workflow patterns** from [Microsoft Agent Framework samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/declarative)
+3. **Persistent agent instances** created at startup and reused throughout the demo session
+4. **Native Microsoft Foundry tooling** (AI Search integration, Enterprise Memory) via `azure-ai-projects>=2.0.0b2`
+
+### Key Reference
+
+- **Declarative examples**: https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/declarative
+- **Workflow samples**: https://github.com/microsoft/agent-framework/tree/main/workflow-samples
 
 ---
 
@@ -22,7 +27,6 @@ The Alert Triage Agent (`src/agents/alert_triage_agent.py`) currently uses:
 # Current approach - Programmatic agent creation
 from agent_framework import ChatAgent, ai_function
 from agent_framework.azure import AzureAIAgentClient
-from azure.ai.projects.aio import AIProjectClient
 
 class AlertTriageAgent:
     async def _get_agent(self) -> ChatAgent:
@@ -38,67 +42,54 @@ class AlertTriageAgent:
         )
 ```
 
-**Current Architecture:**
-- Agent created programmatically at runtime
-- Custom `@ai_function` decorated tools
-- Azure AI Search integration via custom code
-- In-memory correlation storage
-- GPT-4.1-mini model via Azure AI Foundry
-
 **Current Limitations:**
 1. Agent recreated each time application starts
-2. No persistent conversation history or memory
-3. Custom AI Search integration (not native)
-4. No declarative configuration (requires code changes)
-5. Limited observability into agent decisions
+2. No declarative configuration (requires code changes to modify behavior)
+3. Tools tightly coupled with agent definition
+4. Difficult to test agent logic without full execution
 
 ---
 
-## Target State: Microsoft Foundry Native Agents
+## Target State: Declarative Agents
 
 ### Target Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    agent.yaml (Declarative Definition)          │
+│           alert_triage_workflow.yaml (Declarative)              │
 │                                                                  │
-│  name: alert-triage-agent                                        │
-│  model: gpt-4o                                                   │
-│  instructions: <system prompt>                                   │
-│  tools:                                                          │
-│    - type: azure_ai_search                                       │
-│    - type: file_search                                           │
-│    - type: function (custom)                                     │
+│  agents:                                                         │
+│    - name: triage_agent                                          │
+│      instructions: <system prompt>                               │
+│      tools: [calculate_risk_score, find_correlated_alerts, ...] │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              Microsoft Foundry Agent Service                     │
+│              DeclarativeAgentLoader                              │
+│         (agent-framework-declarative)                            │
 │                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │ Persistent      │  │ Enterprise      │  │ Native Tools    │  │
-│  │ Agent Instance  │  │ Memory Store    │  │ (AI Search,     │  │
-│  │                 │  │                 │  │ File Search)    │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                              │                                   │
-│              Conversation History & Context                      │
+│  • Loads agents from YAML                                        │
+│  • Binds tool implementations                                    │
+│  • Creates workflow if defined                                   │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Python Application                            │
+│                    ChatAgent (in-memory)                         │
 │                                                                  │
-│  from azure.ai.projects import AIProjectClient                   │
-│  from azure.ai.agents import PersistentAgentsClient              │
+│  • Persistent for demo session                                   │
+│  • Uses AzureOpenAIChatClient                                    │
+│  • Tools: @ai_function decorated                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Optional: Microsoft Foundry Integration             │
 │                                                                  │
-│  # Get existing agent (created via YAML or startup)              │
-│  agent = agents_client.get_agent(agent_id)                       │
-│                                                                  │
-│  # Run with thread for conversation continuity                   │
-│  response = agents_client.runs.create_and_process(               │
-│      thread_id=thread.id,                                        │
-│      agent_id=agent.id                                           │
-│  )                                                               │
+│  • Enterprise Memory (azure-ai-projects>=2.0.0b2)                │
+│  • AI Search for MITRE knowledge base                            │
+│  • Agent persistence in Foundry                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,646 +98,784 @@ class AlertTriageAgent:
 | Aspect | Current (Programmatic) | Target (Declarative) |
 |--------|------------------------|----------------------|
 | **Configuration** | Python code | YAML files |
-| **Agent Lifecycle** | Created per request | Persistent, reused |
-| **Memory** | None | Enterprise Memory Store |
-| **Knowledge Base** | Custom AI Search | Native File Search + AI Search |
-| **Tools** | @ai_function decorators | Native + Function calling |
-| **Observability** | Custom logging | Native tracing & App Insights |
-| **Deployment** | Code changes | YAML updates + azd deploy |
+| **Agent Lifecycle** | Created at runtime | Loaded at startup, reused |
+| **Testing** | Full execution required | Dry-run mode available |
+| **Tool Binding** | Hardcoded in class | Dynamic from YAML |
+| **Deployment** | Code changes | YAML updates |
+| **Experimentation** | Requires code changes | Edit YAML, reload |
 
 ---
 
 ## Detailed Refactoring Plan
 
-### Phase 1: Dependencies and SDK Migration
+### Phase 1: Add Declarative Dependencies
 
-**Objective:** Update to the latest Azure AI SDKs that support declarative agents
+**Objective:** Install `agent-framework-declarative` and update dependencies
 
 **Tasks:**
 
 1. **Update `requirements.txt`**
    ```diff
-   - agent-framework #>=0.1.0
-   - agent-framework-azure-ai #>=0.1.0
-   - azure-ai-projects>=1.0.0
+    # Keep current agent-framework packages
+    agent-framework #>=0.1.0
+    agent-framework-azure-ai #>=0.1.0
+   + # Add declarative support
+   + agent-framework-declarative --pre
+   + 
+   + # Add Foundry SDK for native features
    + azure-ai-projects>=2.0.0b2
    + azure-ai-agents>=1.0.0b1
-   # Note: agent-framework-declarative is optional - YAML parsing can be done with PyYAML
-   # Include if using the Microsoft Agent Framework's declarative loader
    ```
 
-2. **Install Pre-release Packages**
+2. **Install Packages**
    ```bash
+   # Install full agent-framework suite with declarative support
+   pip install agent-framework --pre
+   
+   # Or install specific packages
+   pip install agent-framework-declarative --pre
    pip install --pre azure-ai-projects>=2.0.0b2
-   pip install azure-ai-agents
+   pip install azure-ai-agents>=1.0.0b1
    ```
 
-3. **Update Authentication Pattern**
-   - Continue using `DefaultAzureCredential` or `AzureCliCredential`
-   - Ensure proper RBAC roles on Foundry project
+3. **Verify Installation**
+   ```bash
+   python -c "from agent_framework.declarative import load_workflow; print('✓ Declarative support installed')"
+   ```
 
 **Estimated Effort:** 0.5 days
 
+**Deliverables:**
+- Updated `requirements.txt`
+- Verified package installation
+
 ---
 
-### Phase 2: Create Declarative Agent YAML Definitions
+### Phase 2: Create Declarative YAML Definitions
 
-**Objective:** Define the Alert Triage Agent as a declarative YAML file
+**Objective:** Define Alert Triage Agent as a declarative YAML workflow
+
+**Reference:** 
+- https://github.com/microsoft/agent-framework/tree/main/workflow-samples
+- Examples: `CustomerSupport.yaml`, `Marketing.yaml`, `MathChat.yaml`
 
 **Tasks:**
 
-1. **Create Agent YAML Definition**
+1. **Create Main Workflow YAML**
 
-   Create file: `src/agents/definitions/alert_triage_agent.yaml`
+   Create file: `src/agents/definitions/alert_triage_workflow.yaml`
 
    ```yaml
-   # yaml-language-server: $schema=https://aka.ms/ai-foundry-vsc/agent/1.0.0
-   version: 1.0.0
-   name: alert-triage-agent
-   description: AI-powered security alert triage agent for SOC operations
+   # Alert Triage Workflow - Declarative Definition
+   # Based on Microsoft Agent Framework workflow samples
    
-   metadata:
-     authors:
-       - security-operations@contoso.com
-     tags:
-       - security
-       - soc
-       - alert-triage
-       - agentic-soc
+   name: AlertTriageWorkflow
+   description: AI-powered security alert triage workflow for SOC operations
    
-   model:
-     # Use gpt-4o or your preferred deployed model
-     # Note: gpt-4.1-mini used in current implementation can be used if deployed
-     # gpt-4o is recommended for improved reasoning in declarative agents
-     id: gpt-4o
-     options:
-       temperature: 0.3
-       top_p: 0.9
-   
-   instructions: |
-     You are an autonomous security analyst agent specializing in alert triage and automated response.
-     
-     PRIMARY GOAL: Provide actionable remediation steps to enable automated response. 
-     Avoid human escalation except for the most critical, ambiguous scenarios.
-     
-     Your role is to analyze security alerts, make intelligent triage decisions, 
-     and prescribe specific next actions for automated systems or other agents to execute.
-     
-     Analysis Process:
-     1. Search the MITRE ATT&CK knowledge base for technique context
-     2. Check for correlated alerts to identify potential attack campaigns
-     3. Calculate risk score using all available alert factors
-     4. Synthesize all information to determine the appropriate triage decision
-     5. Prescribe specific, actionable remediation steps
-     
-     Triage Decisions:
-     - EscalateToIncident: High risk, multiple correlations, critical threat
-     - CorrelateWithExisting: Moderate risk, needs monitoring
-     - MarkAsFalsePositive: Clear benign activity, low risk
-     - RequireHumanReview: Ambiguous, requires expert judgment (USE SPARINGLY)
-   
-   tools:
-     # Native Azure AI Search for MITRE ATT&CK knowledge base
-     - type: azure_ai_search
-       name: mitre-attack-search
-       config:
-         index_name: attack-scenarios
-         connection_id: ${AZURE_SEARCH_CONNECTION_ID}
-     
-     # File Search for attack documentation
-     - type: file_search
-       name: threat-intelligence
-       config:
-         vector_store_id: ${VECTOR_STORE_ID}
-     
-     # Custom function tools
-     - type: function
-       name: calculate_risk_score
-       description: Calculate risk score for a security alert
-       parameters:
-         type: object
-         properties:
-           severity:
-             type: string
-             description: Alert severity (High, Medium, Low, Informational)
-           entity_count:
-             type: integer
-             description: Number of entities involved
-           mitre_techniques:
-             type: array
-             items:
-               type: string
-             description: MITRE ATT&CK technique IDs
-           confidence_score:
-             type: integer
-             description: Detection confidence (0-100)
-         required:
-           - severity
-           - entity_count
-           - confidence_score
-     
-     - type: function
-       name: find_correlated_alerts
-       description: Find related alerts by entity overlap
-       parameters:
-         type: object
-         properties:
-           alert_entities:
-             type: array
-             items:
-               type: object
-               properties:
-                 type:
+   agents:
+     - name: triage_agent
+       type: chat_agent
+       instructions: |
+         You are an autonomous security analyst agent specializing in alert triage.
+         
+         Your role is to analyze security alerts, make intelligent triage decisions, 
+         and prescribe specific next actions for automated systems.
+         
+         Analysis Process:
+         1. Search the MITRE ATT&CK knowledge base for technique context
+         2. Check for correlated alerts to identify attack campaigns
+         3. Calculate risk score using all available alert factors
+         4. Synthesize information to determine the triage decision
+         5. Prescribe specific, actionable remediation steps
+         
+         Triage Decisions:
+         - EscalateToIncident: High risk, critical threat
+         - CorrelateWithExisting: Moderate risk, needs monitoring
+         - MarkAsFalsePositive: Clear benign activity
+         - RequireHumanReview: Ambiguous, requires expert judgment
+       
+       tools:
+         # These tools will be bound to implementations at runtime
+         - name: calculate_risk_score
+           description: Calculate risk score for a security alert
+           parameters:
+             type: object
+             properties:
+               severity:
+                 type: string
+                 description: Alert severity (High, Medium, Low, Informational)
+               entity_count:
+                 type: integer
+                 description: Number of entities involved
+               mitre_techniques:
+                 type: array
+                 items:
                    type: string
-                 value:
+                 description: MITRE ATT&CK technique IDs
+               confidence_score:
+                 type: integer
+                 description: Detection confidence (0-100)
+             required:
+               - severity
+               - entity_count
+               - confidence_score
+         
+         - name: find_correlated_alerts
+           description: Find related alerts by entity overlap
+           parameters:
+             type: object
+             properties:
+               alert_entities:
+                 type: array
+                 items:
+                   type: object
+                 description: List of entities from the current alert
+             required:
+               - alert_entities
+         
+         - name: record_triage_decision
+           description: Record the final triage decision
+           parameters:
+             type: object
+             properties:
+               decision:
+                 type: string
+                 enum: [EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, RequireHumanReview]
+               priority:
+                 type: string
+                 enum: [Critical, High, Medium, Low]
+               rationale:
+                 type: string
+                 description: Detailed explanation of decision logic
+             required:
+               - decision
+               - priority
+               - rationale
+         
+         - name: search_mitre_attack
+           description: Search MITRE ATT&CK knowledge base for technique information
+           parameters:
+             type: object
+             properties:
+               technique_ids:
+                 type: array
+                 items:
                    type: string
-             description: Entities from the current alert
-         required:
-           - alert_entities
-     
-     - type: function
-       name: record_triage_decision
-       description: Record the final triage decision
-       parameters:
-         type: object
-         properties:
-           decision:
-             type: string
-             enum: [EscalateToIncident, CorrelateWithExisting, MarkAsFalsePositive, RequireHumanReview]
-           priority:
-             type: string
-             enum: [Critical, High, Medium, Low]
-           rationale:
-             type: string
-             description: Detailed explanation of decision logic
-         required:
-           - decision
-           - priority
-           - rationale
+                 description: MITRE technique IDs to search for
+             required:
+               - technique_ids
    ```
 
-2. **Create Agent Schema Validation**
-   - Use VS Code Microsoft Foundry extension for YAML validation
-   - Validate against `https://aka.ms/ai-foundry-vsc/agent/1.0.0` schema
+2. **Create Dry-Run Workflow for Testing**
 
-**Estimated Effort:** 1 day
+   Create file: `src/agents/definitions/alert_triage_dryrun.yaml`
 
----
+   ```yaml
+   # Dry-run agent for testing without execution
+   # Tools are declared without implementations - agent plans actions only
+   
+   name: AlertTriageDryRun
+   description: Dry-run triage agent for planning without execution
+   
+   agents:
+     - name: triage_planner
+       type: chat_agent
+       instructions: |
+         You plan security alert triage actions but do not execute them.
+         Outline the steps you would take to analyze and triage this alert.
+         
+         Explain your reasoning for each tool you would call and what 
+         decision you would make based on the analysis.
+       
+       tools:
+         # Declarative tools without implementations - dry-run mode
+         - name: calculate_risk_score
+           description: Simulate calculating risk score
+         - name: find_correlated_alerts
+           description: Simulate finding correlated alerts
+         - name: record_triage_decision
+           description: Simulate recording triage decision
+         - name: search_mitre_attack
+           description: Simulate MITRE ATT&CK search
+   ```
 
-### Phase 3: Implement Agent Initialization Service
+3. **Create YAML Validation Utility**
 
-**Objective:** Create a service that creates/retrieves persistent agents on startup
-
-**Tasks:**
-
-1. **Create Agent Manager Module**
-
-   Create file: `src/agents/agent_manager.py`
+   Create file: `utils/validate_agent_yaml.py`
 
    ```python
    """
-   Agent Manager for Microsoft Foundry Declarative Agents.
-   
-   Handles agent lifecycle: creation, retrieval, and reuse of persistent agents.
+   Validate agent YAML definitions.
+   Ensures YAML files conform to expected structure.
    """
    
+   import yaml
+   from pathlib import Path
+   import sys
+   
+   def validate_yaml(yaml_path: str) -> bool:
+       """Validate agent YAML file structure."""
+       try:
+           with open(yaml_path, 'r') as f:
+               config = yaml.safe_load(f)
+           
+           # Check required top-level fields
+           required_fields = ['name', 'agents']
+           for field in required_fields:
+               if field not in config:
+                   print(f"❌ Error: Missing required field '{field}'")
+                   return False
+           
+           # Validate agents
+           for agent in config.get('agents', []):
+               if 'name' not in agent:
+                   print(f"❌ Error: Agent missing 'name' field")
+                   return False
+               if 'instructions' not in agent:
+                   print(f"❌ Error: Agent '{agent.get('name')}' missing 'instructions'")
+                   return False
+               
+               # Validate tools if present
+               tools = agent.get('tools', [])
+               for tool in tools:
+                   if 'name' not in tool:
+                       print(f"❌ Error: Tool in agent '{agent.get('name')}' missing 'name'")
+                       return False
+           
+           print(f"✅ YAML validation passed: {yaml_path}")
+           return True
+           
+       except yaml.YAMLError as e:
+           print(f"❌ Error: Invalid YAML syntax: {e}")
+           return False
+       except Exception as e:
+           print(f"❌ Error: {e}")
+           return False
+   
+   if __name__ == "__main__":
+       if len(sys.argv) < 2:
+           print("Usage: python validate_agent_yaml.py <yaml_file>")
+           sys.exit(1)
+       
+       yaml_file = sys.argv[1]
+       if not Path(yaml_file).exists():
+           print(f"❌ Error: File not found: {yaml_file}")
+           sys.exit(1)
+       
+       success = validate_yaml(yaml_file)
+       sys.exit(0 if success else 1)
+   ```
+
+**Estimated Effort:** 1.5 days
+
+**Deliverables:**
+- `alert_triage_workflow.yaml` - Main agent definition
+- `alert_triage_dryrun.yaml` - Dry-run testing agent
+- `validate_agent_yaml.py` - YAML validation utility
+
+---
+
+### Phase 3: Implement Declarative Agent Loader
+
+**Objective:** Create service to load agents from YAML using `agent-framework-declarative`
+
+**Tasks:**
+
+1. **Create Declarative Loader Module**
+
+   Create file: `src/agents/declarative_loader.py`
+
+   ```python
+   """
+   Declarative Agent Loader using Microsoft Agent Framework.
+   
+   Loads agents from YAML definitions and manages their lifecycle.
+   Reference: https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/declarative
+   """
+   
+   import asyncio
    import os
    import yaml
    from pathlib import Path
-   from typing import Optional
+   from typing import Optional, Dict, Any, Callable
    
-   from azure.ai.projects import AIProjectClient
-   from azure.ai.agents import PersistentAgentsClient
-   from azure.ai.agents.models import (
-       CreateAgentOptions,
-       FileSearchToolDefinition,
-       AzureAISearchToolDefinition,
-       FunctionTool,
-       PersistentAgent,
-   )
-   from azure.identity import DefaultAzureCredential
+   from agent_framework import ChatAgent, WorkflowBuilder
+   from agent_framework.azure import AzureOpenAIChatClient
+   from azure.identity import AzureCliCredential
    
    from src.shared.logging import get_logger
    
    logger = get_logger(__name__)
    
    
-   class AgentManager:
-       """Manages persistent Foundry agents."""
+   class DeclarativeAgentLoader:
+       """Loads and manages declarative agents from YAML files."""
        
        def __init__(
            self,
-           project_endpoint: Optional[str] = None,
+           definitions_dir: str = "src/agents/definitions",
        ):
-           self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-           self._credential = DefaultAzureCredential()
-           self._project_client = AIProjectClient(
-               endpoint=self.project_endpoint,
-               credential=self._credential
-           )
-           self._agents_client = PersistentAgentsClient(
-               endpoint=self.project_endpoint,
-               credential=self._credential
-           )
-           self._agents_cache: dict[str, PersistentAgent] = {}
+           """
+           Initialize the declarative agent loader.
+           
+           Args:
+               definitions_dir: Directory containing YAML agent definitions
+           """
+           self.definitions_dir = Path(definitions_dir)
+           self._agents_cache: Dict[str, ChatAgent] = {}
+           self._chat_client = None
        
-       def load_agent_definition(self, yaml_path: str) -> dict:
+       def _get_chat_client(self) -> AzureOpenAIChatClient:
+           """Get or create Azure OpenAI chat client."""
+           if self._chat_client is None:
+               # Use Azure CLI credential for authentication
+               self._chat_client = AzureOpenAIChatClient(
+                   credential=AzureCliCredential()
+               )
+               logger.info("Created Azure OpenAI chat client")
+           return self._chat_client
+       
+       def load_yaml_definition(self, yaml_path: Path) -> dict:
            """Load agent definition from YAML file."""
+           logger.info(f"Loading YAML definition from: {yaml_path}")
            with open(yaml_path, 'r') as f:
                return yaml.safe_load(f)
        
-       async def get_or_create_agent(
+       async def load_agent_from_yaml(
            self,
-           agent_name: str,
-           yaml_path: Optional[str] = None,
-           force_create: bool = False
-       ) -> PersistentAgent:
-           """Get existing agent or create new one from YAML definition."""
+           yaml_filename: str,
+           tool_implementations: Optional[Dict[str, Callable]] = None,
+           force_reload: bool = False
+       ) -> ChatAgent:
+           """
+           Load an agent from a YAML definition file.
            
-           # Check cache first
-           if agent_name in self._agents_cache and not force_create:
-               logger.info(f"Using cached agent: {agent_name}")
-               return self._agents_cache[agent_name]
+           Args:
+               yaml_filename: Name of the YAML file (e.g., "alert_triage_workflow.yaml")
+               tool_implementations: Dict mapping tool names to @ai_function implementations
+               force_reload: Force reload even if cached
            
-           # Try to find existing agent by name
-           if not force_create:
-               existing = await self._find_agent_by_name(agent_name)
-               if existing:
-                   self._agents_cache[agent_name] = existing
-                   logger.info(f"Found existing agent: {agent_name} (ID: {existing.id})")
-                   return existing
+           Returns:
+               ChatAgent instance configured from YAML
+               
+           Example:
+               tools = AlertTriageTools()
+               tool_impls = {
+                   "calculate_risk_score": tools.calculate_risk_score,
+                   "find_correlated_alerts": tools.find_correlated_alerts,
+               }
+               agent = await loader.load_agent_from_yaml(
+                   "alert_triage_workflow.yaml",
+                   tool_implementations=tool_impls
+               )
+           """
+           yaml_path = self.definitions_dir / yaml_filename
            
-           # Create new agent from YAML
-           if not yaml_path:
-               yaml_path = f"src/agents/definitions/{agent_name}.yaml"
+           # Check cache
+           cache_key = str(yaml_path)
+           if not force_reload and cache_key in self._agents_cache:
+               logger.info(f"Using cached agent from: {yaml_filename}")
+               return self._agents_cache[cache_key]
            
-           definition = self.load_agent_definition(yaml_path)
-           agent = await self._create_agent_from_definition(definition)
-           self._agents_cache[agent_name] = agent
-           logger.info(f"Created new agent: {agent_name} (ID: {agent.id})")
+           # Load YAML definition
+           definition = self.load_yaml_definition(yaml_path)
+           
+           # Extract agent configuration
+           agents_config = definition.get('agents', [])
+           if not agents_config:
+               raise ValueError(f"No agents defined in {yaml_filename}")
+           
+           # Support single agent for now (can be extended to workflows)
+           agent_config = agents_config[0]
+           agent_name = agent_config.get('name', 'unnamed_agent')
+           instructions = agent_config.get('instructions', '')
+           
+           logger.info(f"Configuring agent: {agent_name}")
+           
+           # Build tools list
+           tools = []
+           tool_configs = agent_config.get('tools', [])
+           
+           for tool_config in tool_configs:
+               tool_name = tool_config.get('name')
+               
+               # Get implementation from provided dict
+               if tool_implementations and tool_name in tool_implementations:
+                   tools.append(tool_implementations[tool_name])
+                   logger.debug(f"  ✓ Bound tool: {tool_name}")
+               else:
+                   # Tool declared but not implemented (dry-run mode)
+                   logger.warning(f"  ⚠ Tool '{tool_name}' has no implementation (dry-run mode)")
+           
+           # Create agent
+           chat_client = self._get_chat_client()
+           agent = chat_client.create_agent(
+               instructions=instructions,
+               name=agent_name,
+               tools=tools if tools else None
+           )
+           
+           # Cache agent
+           self._agents_cache[cache_key] = agent
+           logger.info(f"✅ Agent loaded successfully: {agent_name} ({len(tools)} tools)")
+           
            return agent
        
-       async def _find_agent_by_name(self, name: str) -> Optional[PersistentAgent]:
-           """Find existing agent by name."""
-           try:
-               agents = self._agents_client.administration.list_agents()
-               for agent in agents:
-                   if agent.name == name:
-                       return agent
-           except Exception as e:
-               logger.warning(f"Could not list agents: {e}")
-           return None
-       
-       async def _create_agent_from_definition(self, definition: dict) -> PersistentAgent:
-           """Create agent from YAML definition."""
-           tools = self._build_tools(definition.get('tools', []))
+       async def load_workflow_from_yaml(
+           self,
+           yaml_filename: str,
+           tool_implementations: Optional[Dict[str, Callable]] = None
+       ):
+           """
+           Load a workflow from a YAML definition file.
            
-           options = CreateAgentOptions(
-               model=definition['model']['id'],
-               name=definition['name'],
-               instructions=definition['instructions'],
-               tools=tools,
-               metadata={
-                   'version': definition.get('version', '1.0.0'),
-                   'description': definition.get('description', ''),
-               }
-           )
+           For workflows with multiple agents, this creates a WorkflowBuilder
+           and connects agents based on the workflow definition.
            
-           return self._agents_client.administration.create_agent(options)
-       
-       def _build_tools(self, tool_definitions: list) -> list:
-           """Build tool instances from YAML definitions."""
-           tools = []
-           for tool_def in tool_definitions:
-               tool_type = tool_def.get('type')
+           Args:
+               yaml_filename: Name of the YAML file
+               tool_implementations: Dict mapping tool names to implementations
+           
+           Returns:
+               Workflow instance or single agent if no workflow defined
+           """
+           yaml_path = self.definitions_dir / yaml_filename
+           definition = self.load_yaml_definition(yaml_path)
+           
+           logger.info(f"Loading workflow from: {yaml_filename}")
+           
+           # Load agents
+           agents_config = definition.get('agents', [])
+           agents = {}
+           
+           for agent_config in agents_config:
+               agent_name = agent_config.get('name')
+               instructions = agent_config.get('instructions', '')
                
-               if tool_type == 'azure_ai_search':
-                   tools.append(self._build_ai_search_tool(tool_def))
-               elif tool_type == 'file_search':
-                   tools.append(FileSearchToolDefinition())
-               elif tool_type == 'function':
-                   tools.append(self._build_function_tool(tool_def))
+               # Build tools for this agent
+               tools = []
+               tool_configs = agent_config.get('tools', [])
+               
+               for tool_config in tool_configs:
+                   tool_name = tool_config.get('name')
+                   if tool_implementations and tool_name in tool_implementations:
+                       tools.append(tool_implementations[tool_name])
+               
+               # Create agent
+               chat_client = self._get_chat_client()
+               agent = chat_client.create_agent(
+                   instructions=instructions,
+                   name=agent_name,
+                   tools=tools if tools else None
+               )
+               agents[agent_name] = agent
+               logger.debug(f"  Created agent: {agent_name}")
            
-           return tools
-       
-       def _build_ai_search_tool(self, tool_def: dict) -> AzureAISearchToolDefinition:
-           """Build Azure AI Search tool from definition."""
-           config = tool_def.get('config', {})
-           connection_id = os.path.expandvars(config.get('connection_id', ''))
+           # Build workflow if multiple agents
+           workflow_config = definition.get('workflow')
+           if workflow_config and len(agents) > 1:
+               builder = WorkflowBuilder()
+               
+               # Set start agent
+               start_agent_name = workflow_config.get('start')
+               if start_agent_name and start_agent_name in agents:
+                   builder.set_start_executor(agents[start_agent_name])
+                   logger.debug(f"  Set start agent: {start_agent_name}")
+               
+               # Add edges
+               edges = workflow_config.get('edges', [])
+               for edge in edges:
+                   from_agent = agents.get(edge.get('from'))
+                   to_agent = agents.get(edge.get('to'))
+                   if from_agent and to_agent:
+                       builder.add_edge(from_agent, to_agent)
+                       logger.debug(f"  Added edge: {edge.get('from')} -> {edge.get('to')}")
+               
+               workflow = builder.build()
+               logger.info(f"✅ Workflow loaded: {len(agents)} agents, {len(edges)} edges")
+               return workflow
            
-           return AzureAISearchToolDefinition(
-               index_name=config.get('index_name'),
-               connection_id=connection_id
-           )
+           # Return single agent if no workflow
+           if agents:
+               single_agent = list(agents.values())[0]
+               logger.info(f"✅ Single agent loaded: {single_agent.name if hasattr(single_agent, 'name') else 'unnamed'}")
+               return single_agent
+           
+           raise ValueError(f"No agents found in {yaml_filename}")
        
-       def _build_function_tool(self, tool_def: dict) -> dict:
-           """Build function tool definition."""
-           return {
-               'type': 'function',
-               'function': {
-                   'name': tool_def['name'],
-                   'description': tool_def['description'],
-                   'parameters': tool_def['parameters']
-               }
-           }
-       
-       async def delete_agent(self, agent_id: str) -> None:
-           """Delete a persistent agent."""
-           await self._agents_client.administration.delete_agent(agent_id)
-           # Clear from cache
-           for name, agent in list(self._agents_cache.items()):
-               if agent.id == agent_id:
-                   del self._agents_cache[name]
+       def clear_cache(self):
+           """Clear the agents cache."""
+           self._agents_cache.clear()
+           logger.info("Agent cache cleared")
    ```
 
 2. **Create Startup Initialization Script**
 
-   Create file: `utils/initialize_agents.py`
+   Create file: `utils/initialize_declarative_agents.py`
 
    ```python
    """
-   Initialize Foundry Agents on application startup.
+   Initialize Declarative Agents on application startup.
    
-   This script creates or retrieves persistent agents defined in YAML files.
-   Run once at demo startup or deployment to ensure agents are ready.
+   This script loads agents from YAML definitions and prepares them for use.
+   Run once at demo startup to load and cache agents for the session.
    """
    
    import asyncio
-   from src.agents.agent_manager import AgentManager
+   import sys
+   from pathlib import Path
+   
+   # Add src to path
+   sys.path.insert(0, str(Path(__file__).parent.parent))
+   
+   from src.agents.declarative_loader import DeclarativeAgentLoader
+   from src.agents.alert_triage_agent import AlertTriageTools
    from src.shared.logging import configure_logging, get_logger
    
    logger = get_logger(__name__)
    
    
    async def initialize_agents():
-       """Initialize all persistent agents for the Agentic SOC."""
+       """Initialize all declarative agents for the Agentic SOC."""
        
-       logger.info("Initializing Foundry Agents...")
+       logger.info("=" * 60)
+       logger.info("Initializing Declarative Agents")
+       logger.info("=" * 60)
        
-       manager = AgentManager()
+       loader = DeclarativeAgentLoader()
        
-       # Initialize Alert Triage Agent
-       triage_agent = await manager.get_or_create_agent(
-           agent_name="alert-triage-agent",
-           yaml_path="src/agents/definitions/alert_triage_agent.yaml"
-       )
-       logger.info(f"Alert Triage Agent ready: {triage_agent.id}")
-       
-       # Future: Initialize other agents
-       # hunting_agent = await manager.get_or_create_agent("threat-hunting-agent")
-       # response_agent = await manager.get_or_create_agent("incident-response-agent")
-       
-       return {
-           "alert_triage": triage_agent,
+       # Initialize tool implementations
+       logger.info("\n📦 Setting up tool implementations...")
+       tools = AlertTriageTools()
+       tool_implementations = {
+           "calculate_risk_score": tools.calculate_risk_score,
+           "find_correlated_alerts": tools.find_correlated_alerts,
+           "record_triage_decision": tools.record_triage_decision,
+           "search_mitre_attack": tools.get_mitre_context,
        }
+       logger.info(f"✓ Configured {len(tool_implementations)} tool implementations")
+       
+       # Load Alert Triage Agent from YAML
+       logger.info("\n🤖 Loading Alert Triage Agent from YAML...")
+       triage_agent = await loader.load_agent_from_yaml(
+           "alert_triage_workflow.yaml",
+           tool_implementations=tool_implementations
+       )
+       
+       # Load dry-run agent for testing
+       logger.info("\n🧪 Loading Dry-run Agent for testing...")
+       dryrun_agent = await loader.load_agent_from_yaml(
+           "alert_triage_dryrun.yaml"
+       )
+       
+       agents = {
+           "alert_triage": triage_agent,
+           "alert_triage_dryrun": dryrun_agent,
+       }
+       
+       logger.info("\n" + "=" * 60)
+       logger.info(f"✅ Successfully initialized {len(agents)} agents")
+       logger.info("=" * 60)
+       logger.info("")
+       
+       return agents
    
    
    if __name__ == "__main__":
        configure_logging(log_level="INFO")
-       agents = asyncio.run(initialize_agents())
-       print(f"Initialized {len(agents)} agents")
+       
+       try:
+           agents = asyncio.run(initialize_agents())
+           print(f"\n✨ Agents ready for demo session:")
+           for name in agents:
+               print(f"   • {name}")
+       except Exception as e:
+           logger.error(f"Failed to initialize agents: {e}", exc_info=True)
+           sys.exit(1)
    ```
 
 **Estimated Effort:** 2 days
 
+**Deliverables:**
+- `declarative_loader.py` - YAML agent loader
+- `initialize_declarative_agents.py` - Startup initialization script
+
 ---
 
-### Phase 4: Integrate Enterprise Memory
+### Phase 4: Refactor Alert Triage Agent
 
-**Objective:** Add native Microsoft Foundry Enterprise Memory for conversation continuity
+**Objective:** Update to use declarative agent loaded from YAML
 
 **Tasks:**
 
-1. **Create Memory Store**
+1. **Extract Tool Implementations**
+
+   Update `src/agents/alert_triage_agent.py` to keep only tool implementations:
+
    ```python
-   from azure.ai.projects import AIProjectClient
+   """
+   Alert Triage Tools - Implementation of @ai_function tools.
    
-   # Create memory store for the triage agent
-   memory_store = project_client.memory_stores.create(
-       name="soc-triage-memory",
-       description="Memory store for alert triage agent",
-       chat_model_deployment="gpt-4o",
-       embedding_model_deployment="text-embedding-3-small"
-   )
-   ```
-
-2. **Integrate Memory in Agent Runs**
-   ```python
-   # Add memories from conversation
-   project_client.memory_stores.update_memories(
-       name="soc-triage-memory",
-       scope=f"user:{user_id}",
-       content=[
-           {"role": "user", "content": "Analyzed alert XYZ..."},
-           {"role": "assistant", "content": "Decision: Escalate..."}
-       ]
-   )
+   These tools are bound to the declarative agent defined in YAML.
+   """
    
-   # Search memories before responding
-   memories = project_client.memory_stores.search_memories(
-       name="soc-triage-memory",
-       scope=f"user:{user_id}",
-       query="similar alerts from host WS-001"
-   )
+   import json
+   import random
+   from typing import Annotated, List, Dict
+   from pydantic import Field
+   
+   from agent_framework import ai_function
+   from src.shared.logging import get_logger
+   
+   logger = get_logger(__name__)
+   
+   
+   class AlertTriageTools:
+       """Tool implementations for Alert Triage Agent."""
+       
+       def __init__(self):
+           self._recent_alerts = []
+       
+       @ai_function(description="Calculate risk score for a security alert")
+       def calculate_risk_score(
+           severity: Annotated[str, Field(description="Alert severity")],
+           entity_count: Annotated[int, Field(description="Number of entities")],
+           mitre_techniques: Annotated[List[str], Field(description="MITRE technique IDs")],
+           confidence_score: Annotated[int, Field(description="Detection confidence")]
+       ) -> str:
+           """Calculate risk score (same logic as before)."""
+           score = 0
+           # ... existing calculation logic ...
+           return json.dumps({"risk_score": score, "explanation": "..."})
+       
+       @ai_function(description="Find related alerts by entity overlap")
+       def find_correlated_alerts(
+           alert_entities: Annotated[List[Dict], Field(description="Entities from alert")]
+       ) -> str:
+           """Find correlated alerts."""
+           # ... existing logic ...
+           return json.dumps({"correlated_count": 0})
+       
+       @ai_function(description="Record triage decision")
+       def record_triage_decision(
+           decision: Annotated[str, Field(description="Triage decision")],
+           priority: Annotated[str, Field(description="Priority level")],
+           rationale: Annotated[str, Field(description="Decision rationale")]
+       ) -> str:
+           """Record the triage decision."""
+           # ... existing logic ...
+           return json.dumps({"decision": decision, "priority": priority})
+       
+       @ai_function(description="Search MITRE ATT&CK knowledge base")
+       def get_mitre_context(
+           technique_ids: Annotated[List[str], Field(description="MITRE technique IDs")]
+       ) -> str:
+           """Get MITRE ATT&CK context."""
+           # ... existing logic ...
+           return json.dumps({"techniques": []})
    ```
 
-3. **Add Memory Configuration to Agent YAML**
-   ```yaml
-   memory:
-     store_name: soc-triage-memory
-     scope_prefix: soc-analyst
-     profile_details: |
-       Track alert patterns, escalation history, and analyst preferences.
-       Avoid storing sensitive PII.
-   ```
-
-**Estimated Effort:** 1.5 days
-
----
-
-### Phase 5: Native AI Search Integration
-
-**Objective:** Replace custom AI Search code with native Foundry tool
-
-**Tasks:**
-
-1. **Configure Azure AI Search Connection in Foundry Portal**
-   - Create connection to existing `attack-scenarios` index
-   - Note connection ID for agent YAML
-
-2. **Update Agent YAML with AI Search Tool**
-   ```yaml
-   tools:
-     - type: azure_ai_search
-       name: mitre-attack-knowledge
-       config:
-         connection_id: /subscriptions/{sub}/resourceGroups/{rg}/...
-         index_name: attack-scenarios
-         query_type: semantic  # or vector, hybrid
-   ```
-
-3. **Remove Custom AI Search Code**
-   - Delete `get_mitre_context` tool implementation
-   - Remove `_search_client_config` module-level state
-   - Remove Azure Search SDK imports from agent
-
-**Estimated Effort:** 1 day
-
----
-
-### Phase 6: Refactor Alert Triage Agent
-
-**Objective:** Update the agent class to use persistent Foundry agents
-
-**Tasks:**
-
-1. **Create New Agent Implementation**
+2. **Create New Agent Wrapper**
 
    Create file: `src/agents/alert_triage_agent_v2.py`
 
    ```python
    """
-   Alert Triage Agent v2 - Using Microsoft Foundry Persistent Agents.
+   Alert Triage Agent V2 - Using Declarative YAML Definition.
    
-   This agent uses declarative YAML definitions and native Foundry tools.
+   This version loads the agent from a YAML file at startup and reuses
+   it throughout the demo session.
    """
    
-   import asyncio
-   import json
-   import os
-   import random
    import time
-   from typing import Optional, Dict, Any, List
-   from uuid import UUID, uuid4
+   from typing import Optional
+   from uuid import uuid4
    from datetime import datetime
    
-   from azure.ai.projects import AIProjectClient
-   from azure.ai.agents import PersistentAgentsClient
-   from azure.ai.agents.models import (
-       PersistentAgent,
-       ThreadRun,
-       MessageRole,
-   )
-   from azure.identity import DefaultAzureCredential
+   from agent_framework import ChatAgent
    
-   from src.agents.agent_manager import AgentManager
-   from src.shared.schemas import (
-       SecurityAlert,
-       TriageResult,
-       TriagePriority,
-       TriageDecision,
-   )
+   from src.agents.declarative_loader import DeclarativeAgentLoader
+   from src.agents.alert_triage_agent import AlertTriageTools
+   from src.shared.schemas import SecurityAlert, TriageResult, TriagePriority, TriageDecision
    from src.shared.logging import get_logger
-   from src.shared.audit import get_audit_service, AuditResult
    from src.shared.metrics import counter
+   from src.shared.audit import get_audit_service, AuditResult
    
    logger = get_logger(__name__)
    
    
    class AlertTriageAgentV2:
-       """
-       Alert Triage Agent using Microsoft Foundry Persistent Agents.
+       """Alert Triage Agent using declarative YAML definition."""
        
-       Key differences from v1:
-       - Uses persistent agent (created once, reused)
-       - Native AI Search tool for MITRE context
-       - Enterprise Memory for conversation history
-       - Declarative YAML configuration
-       """
+       AGENT_VERSION = "2.0.0-declarative"
+       YAML_FILE = "alert_triage_workflow.yaml"
        
-       AGENT_NAME = "alert-triage-agent"
-       AGENT_VERSION = "2.0.0"
-       
-       def __init__(
-           self,
-           project_endpoint: Optional[str] = None,
-       ):
-           self.project_endpoint = project_endpoint or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-           self._credential = DefaultAzureCredential()
-           self._project_client = AIProjectClient(
-               endpoint=self.project_endpoint,
-               credential=self._credential
-           )
-           self._agents_client = PersistentAgentsClient(
-               endpoint=self.project_endpoint,
-               credential=self._credential
-           )
-           self._agent_manager = AgentManager(project_endpoint)
-           self._agent: Optional[PersistentAgent] = None
+       def __init__(self):
+           """Initialize the declarative agent."""
+           self._loader = DeclarativeAgentLoader()
+           self._agent: Optional[ChatAgent] = None
+           self._tools = AlertTriageTools()
            self.audit_service = get_audit_service()
        
        async def initialize(self) -> None:
-           """Initialize the persistent agent."""
-           self._agent = await self._agent_manager.get_or_create_agent(
-               agent_name=self.AGENT_NAME,
-               yaml_path="src/agents/definitions/alert_triage_agent.yaml"
+           """Load agent from YAML definition."""
+           if self._agent is not None:
+               logger.info("Agent already initialized, reusing existing instance")
+               return
+           
+           logger.info(f"Loading agent from YAML: {self.YAML_FILE}")
+           
+           # Prepare tool implementations
+           tool_implementations = {
+               "calculate_risk_score": self._tools.calculate_risk_score,
+               "find_correlated_alerts": self._tools.find_correlated_alerts,
+               "record_triage_decision": self._tools.record_triage_decision,
+               "search_mitre_attack": self._tools.get_mitre_context,
+           }
+           
+           # Load agent from YAML
+           self._agent = await self._loader.load_agent_from_yaml(
+               self.YAML_FILE,
+               tool_implementations=tool_implementations
            )
-           logger.info(f"Agent initialized: {self._agent.id}")
+           
+           logger.info(f"✅ Agent initialized successfully (v{self.AGENT_VERSION})")
        
-       async def triage_alert(
-           self,
-           alert: SecurityAlert,
-           thread_id: Optional[str] = None
-       ) -> TriageResult:
+       async def triage_alert(self, alert: SecurityAlert) -> TriageResult:
            """
-           Triage a security alert using the persistent Foundry agent.
+           Triage a security alert using the declarative agent.
            
            Args:
                alert: Security alert to triage
-               thread_id: Optional thread ID for conversation continuity
            
            Returns:
-               TriageResult with triage analysis
+               TriageResult with analysis
            """
            start_time = time.time()
            
-           if not self._agent:
+           # Ensure agent is loaded
+           if self._agent is None:
                await self.initialize()
            
-           # Create or use existing thread
-           if thread_id:
-               thread = self._agents_client.threads.get(thread_id)
-           else:
-               thread = self._agents_client.threads.create()
+           logger.info(f"Triaging alert: {alert.AlertName}")
            
            # Build triage query
            query = self._build_triage_query(alert)
            
-           # Add message to thread
-           self._agents_client.messages.create(
-               thread_id=thread.id,
-               role=MessageRole.USER,
-               content=query
-           )
+           # Run agent
+           response = await self._agent.run(query)
            
-           # Run the agent
-           run = self._agents_client.runs.create_and_process(
-               thread_id=thread.id,
-               agent_id=self._agent.id,
-               additional_instructions=self._get_alert_context(alert)
-           )
+           # Parse response
+           triage_result = self._parse_response(response, alert, start_time)
            
-           # Handle function calls if needed
-           while run.status == "requires_action":
-               run = await self._handle_function_calls(run, thread.id, alert)
-           
-           # Extract result from messages
-           messages = self._agents_client.messages.list(thread_id=thread.id)
-           triage_result = self._parse_agent_response(messages, alert, start_time)
-           
-           # Log to audit trail
+           # Audit log
            await self.audit_service.log_agent_action(
-               agent_name=self.AGENT_NAME,
+               agent_name="AlertTriageAgentV2",
                action="TriagedAlert",
                target_entity_type="SecurityAlert",
                target_entity_id=str(alert.SystemAlertId),
                result=AuditResult.SUCCESS,
-               details={
-                   "risk_score": triage_result.RiskScore,
-                   "decision": str(triage_result.TriageDecision),
-                   "thread_id": thread.id,
-                   "foundry_native": True
-               }
+               details={"version": self.AGENT_VERSION, "declarative": True}
            )
            
            counter("alerts_triaged_total").inc()
@@ -754,283 +883,274 @@ class AlertTriageAgent:
            return triage_result
        
        def _build_triage_query(self, alert: SecurityAlert) -> str:
-           """Build the triage query for the agent."""
-           entities_list = self._extract_entities(alert)
-           mitre_techniques = alert.ExtendedProperties.get("MitreTechniques", [])
-           
-           return f"""Analyze this security alert and provide a triage decision:
-
-   Alert Name: {alert.AlertName}
-   Alert Type: {alert.AlertType}
-   Severity: {alert.Severity}
-   Description: {alert.Description}
-   MITRE Techniques: {', '.join(mitre_techniques) if mitre_techniques else 'None'}
-   Confidence Score: {alert.ExtendedProperties.get('ConfidenceScore', 75)}%
-
-   Entities involved:
-   {chr(10).join([f"- {e['type']}: {e['value']}" for e in entities_list])}
-
-   Use your tools to:
-   1. Search the MITRE ATT&CK knowledge base for technique context
-   2. Calculate the risk score
-   3. Make and record your triage decision with remediation steps"""
+           """Build triage query for the agent."""
+           # ... existing logic to format alert for agent ...
+           return f"Analyze and triage this alert: {alert.AlertName}"
        
-       def _extract_entities(self, alert: SecurityAlert) -> List[Dict[str, str]]:
-           """Extract entities from alert."""
-           entities = []
-           for entity in alert.Entities:
-               if "HostName" in entity.Properties:
-                   entities.append({"type": "host", "value": entity.Properties["HostName"]})
-               if "UserName" in entity.Properties:
-                   entities.append({"type": "user", "value": entity.Properties["UserName"]})
-               if "IPAddress" in entity.Properties:
-                   entities.append({"type": "ip", "value": entity.Properties["IPAddress"]})
-           return entities
-       
-       async def _handle_function_calls(
-           self,
-           run: ThreadRun,
-           thread_id: str,
-           alert: SecurityAlert
-       ) -> ThreadRun:
-           """Handle function calls from the agent."""
-           tool_calls = run.required_action.submit_tool_outputs.tool_calls
-           tool_outputs = []
-           
-           for call in tool_calls:
-               func_name = call.function.name
-               args = json.loads(call.function.arguments)
-               
-               if func_name == "calculate_risk_score":
-                   output = self._calculate_risk_score(**args)
-               elif func_name == "find_correlated_alerts":
-                   output = self._find_correlated_alerts(**args)
-               elif func_name == "record_triage_decision":
-                   output = json.dumps(args)  # Just echo back the decision
-               else:
-                   output = json.dumps({"error": f"Unknown function: {func_name}"})
-               
-               tool_outputs.append({
-                   "tool_call_id": call.id,
-                   "output": output
-               })
-           
-           # Submit outputs
-           self._agents_client.runs.submit_tool_outputs(
-               thread_id=thread_id,
-               run_id=run.id,
-               tool_outputs=tool_outputs
-           )
-           
-           # Continue processing
-           return self._agents_client.runs.get(thread_id=thread_id, run_id=run.id)
-       
-       def _calculate_risk_score(
-           self,
-           severity: str,
-           entity_count: int,
-           mitre_techniques: List[str] = None,
-           confidence_score: int = 75
-       ) -> str:
-           """Calculate risk score (same logic as v1)."""
-           # Note: random is imported at module level
-           
-           score = 0
-           severity_scores = {"High": 30, "Medium": 20, "Low": 10, "Informational": 5}
-           score += severity_scores.get(severity, 10)
-           score += min(entity_count * 2, 10)
-           score += min(len(mitre_techniques or []) * 5, 25)
-           score += random.randint(5, 20)  # Asset criticality placeholder
-           score += random.randint(2, 10)  # User risk placeholder
-           score += int(confidence_score / 10)
-           
-           return json.dumps({
-               "risk_score": min(score, 100),
-               "explanation": f"Risk score of {min(score, 100)}/100"
-           })
-       
-       def _find_correlated_alerts(self, alert_entities: List[Dict]) -> str:
-           """Find correlated alerts (placeholder for v2)."""
-           # TODO: Query Enterprise Memory or database for correlations
-           return json.dumps({
-               "correlated_count": 0,
-               "has_correlation": False,
-               "note": "Use Enterprise Memory for correlation in production"
-           })
-       
-       def _parse_agent_response(
-           self,
-           messages,
-           alert: SecurityAlert,
-           start_time: float
-       ) -> TriageResult:
+       def _parse_response(self, response, alert, start_time) -> TriageResult:
            """Parse agent response into TriageResult."""
-           # Get last assistant message
-           response_text = ""
-           for msg in messages:
-               if msg.role == "assistant":
-                   for content in msg.content:
-                       if hasattr(content, 'text'):
-                           response_text = content.text.value
-           
-           # Parse decision from response
-           decision = TriageDecision.REQUIRE_HUMAN_REVIEW
-           priority = TriagePriority.MEDIUM
-           risk_score = 50
-           
-           response_lower = response_text.lower()
-           if "escalate" in response_lower and "incident" in response_lower:
-               decision = TriageDecision.ESCALATE_TO_INCIDENT
-               priority = TriagePriority.HIGH
-           elif "correlate" in response_lower:
-               decision = TriageDecision.CORRELATE_WITH_EXISTING
-               priority = TriagePriority.MEDIUM
-           elif "false positive" in response_lower:
-               decision = TriageDecision.MARK_AS_FALSE_POSITIVE
-               priority = TriagePriority.LOW
-           
+           # ... existing parsing logic ...
            return TriageResult(
                AlertId=alert.SystemAlertId,
                TriageId=uuid4(),
                Timestamp=datetime.utcnow(),
-               RiskScore=risk_score,
-               Priority=priority,
-               TriageDecision=decision,
-               Explanation=response_text,
+               RiskScore=50,
+               Priority=TriagePriority.MEDIUM,
+               TriageDecision=TriageDecision.REQUIRE_HUMAN_REVIEW,
+               Explanation=str(response),
                CorrelatedAlertIds=[],
                EnrichmentData={},
                ProcessingTimeMs=int((time.time() - start_time) * 1000),
                AgentVersion=self.AGENT_VERSION
            )
-       
-       async def close(self) -> None:
-           """Clean up resources."""
-           await self._credential.close()
    ```
 
-**Estimated Effort:** 2 days
+**Estimated Effort:** 1.5 days
+
+**Deliverables:**
+- Updated `alert_triage_agent.py` with tools only
+- New `alert_triage_agent_v2.py` using declarative agent
 
 ---
 
-### Phase 7: Update Demo and Testing
+### Phase 5: Update Demo Script
 
-**Objective:** Update demo script and tests for the new implementation
+**Objective:** Update demo to use declarative agents
 
 **Tasks:**
 
 1. **Create New Demo Script**
-   ```bash
-   # utils/demo_foundry_agents.py
-   - Load persistent agent
-   - Process sample alerts
-   - Show Enterprise Memory integration
+
+   Create file: `utils/demo_declarative_agents.py`
+
+   ```python
+   """
+   Demo script for Declarative Alert Triage Agent.
+   
+   Shows agent loaded from YAML definition.
+   """
+   
+   import asyncio
+   import sys
+   from pathlib import Path
+   
+   sys.path.insert(0, str(Path(__file__).parent.parent))
+   
+   from src.agents.alert_triage_agent_v2 import AlertTriageAgentV2
+   from src.data.datasets import get_guide_loader
+   from src.shared.logging import configure_logging, get_logger
+   
+   logger = get_logger(__name__)
+   
+   
+   async def demo_declarative_agent():
+       """Demonstrate declarative alert triage agent."""
+       
+       print("=" * 80)
+       print("DECLARATIVE ALERT TRIAGE AGENT DEMO")
+       print("=" * 80)
+       print()
+       
+       # Initialize agent (loads from YAML once)
+       print("🔄 Initializing agent from YAML definition...")
+       agent = AlertTriageAgentV2()
+       await agent.initialize()
+       print("✅ Agent ready\n")
+       
+       # Load sample alerts
+       print("📥 Loading sample alerts...")
+       guide_loader = get_guide_loader()
+       alerts = guide_loader.load_alerts(max_alerts=3)
+       print(f"✅ Loaded {len(alerts)} alerts\n")
+       
+       # Process alerts (reusing same agent)
+       for i, alert in enumerate(alerts, 1):
+           print(f"\n{'─' * 80}")
+           print(f"📋 ALERT {i}/{len(alerts)}: {alert.AlertName}")
+           print(f"{'─' * 80}")
+           
+           result = await agent.triage_alert(alert)
+           
+           print(f"\n✅ Triage Complete:")
+           print(f"   Risk Score: {result.RiskScore}/100")
+           print(f"   Priority: {result.Priority}")
+           print(f"   Decision: {result.TriageDecision}")
+           print(f"   Time: {result.ProcessingTimeMs}ms")
+       
+       print(f"\n{'=' * 80}")
+       print("✨ Demo Complete - Agent was loaded once and reused")
+       print(f"{'=' * 80}\n")
+   
+   
+   if __name__ == "__main__":
+       configure_logging(log_level="INFO", json_output=False)
+       
+       try:
+           asyncio.run(demo_declarative_agent())
+       except KeyboardInterrupt:
+           print("\n\nDemo interrupted")
+       except Exception as e:
+           logger.error(f"Demo failed: {e}", exc_info=True)
+           sys.exit(1)
    ```
 
-2. **Update Tests**
-   - Add tests for AgentManager
-   - Add tests for YAML loading
-   - Mock Foundry SDK calls
+**Estimated Effort:** 1 day
 
-3. **Update README.md**
-   - Document new architecture
-   - Add setup instructions for Foundry
-   - Update environment variables
+**Deliverables:**
+- `demo_declarative_agents.py` - Demo script showing declarative approach
 
-**Estimated Effort:** 1.5 days
+---
+
+### Phase 6: Optional Foundry Integration
+
+**Objective:** Add native Microsoft Foundry features (Enterprise Memory, AI Search)
+
+This phase is optional and can be done after the declarative approach is working.
+
+**Tasks:**
+
+1. **Add Enterprise Memory** (using `azure-ai-projects>=2.0.0b2`)
+2. **Native AI Search Integration**
+3. **Persistent Agent Storage** in Foundry
+
+**Estimated Effort:** 2-3 days
+
+**Note:** This can be deferred to focus first on getting the declarative approach working.
 
 ---
 
 ## Implementation Timeline
 
-| Phase | Description | Duration | Dependencies |
-|-------|-------------|----------|--------------|
-| 1 | Dependencies & SDK Migration | 0.5 days | None |
-| 2 | Declarative Agent YAML | 1 day | Phase 1 |
-| 3 | Agent Initialization Service | 2 days | Phase 2 |
-| 4 | Enterprise Memory Integration | 1.5 days | Phase 3 |
-| 5 | Native AI Search Integration | 1 day | Phase 3 |
-| 6 | Refactor Alert Triage Agent | 2 days | Phases 4, 5 |
-| 7 | Demo & Testing Updates | 1.5 days | Phase 6 |
+| Phase | Description | Duration | Status |
+|-------|-------------|----------|--------|
+| 1 | Add declarative dependencies | 0.5 days | 📋 Planned |
+| 2 | Create YAML definitions | 1.5 days | 📋 Planned |
+| 3 | Implement declarative loader | 2 days | 📋 Planned |
+| 4 | Refactor Alert Triage Agent | 1.5 days | 📋 Planned |
+| 5 | Update demo script | 1 day | 📋 Planned |
+| 6 | Optional: Foundry integration | 2-3 days | 🔜 Future |
 
-**Total Estimated Effort: ~9.5 days**
+**Total Core Effort: ~6.5 days**
 
 ---
 
-## Environment Setup Requirements
+## Testing Strategy
 
-### Required Environment Variables
+### 1. YAML Validation
 
 ```bash
-# Azure AI Foundry Project
-export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/api/projects/your-project-id"
-
-# Model Deployment
-export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o"
-
-# AI Search Connection ID (from Foundry portal -> Connected Resources -> AI Search)
-# Full format: /subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.CognitiveServices/accounts/{ai-services-name}/projects/{project-name}/connections/{connection-name}
-export AZURE_SEARCH_CONNECTION_ID="/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.CognitiveServices/accounts/{ai-services-name}/projects/{project-name}/connections/{your-search-connection-name}"
-
-# Optional: Memory Store
-export MEMORY_STORE_NAME="soc-triage-memory"
+# Validate YAML files
+python utils/validate_agent_yaml.py src/agents/definitions/alert_triage_workflow.yaml
+python utils/validate_agent_yaml.py src/agents/definitions/alert_triage_dryrun.yaml
 ```
 
-### Azure RBAC Requirements
+### 2. Dry-Run Testing
 
-| Role | Scope | Purpose |
-|------|-------|---------|
-| Azure AI User | Foundry Project | Agent operations |
-| Azure AI Developer | Foundry Project | Create/delete agents |
-| Storage Blob Data Contributor | Storage Account | File uploads |
+```python
+# Test with dry-run agent (no tool implementations)
+loader = DeclarativeAgentLoader()
+dryrun_agent = await loader.load_agent_from_yaml("alert_triage_dryrun.yaml")
+response = await dryrun_agent.run("Analyze alert: Suspicious PowerShell")
+# Agent should plan actions without executing
+```
 
----
+### 3. Full Integration Testing
 
-## Backward Compatibility
-
-### Migration Path
-
-1. **Parallel Running**: Run v1 and v2 agents side-by-side initially
-2. **Feature Flag**: Use environment variable to switch between versions
-3. **Deprecation**: Mark v1 agent as deprecated after validation
-4. **Removal**: Remove v1 code after full migration
-
-### Breaking Changes
-
-1. **Tool Signatures**: Function tool signatures may change
-2. **Response Format**: Agent responses will include thread context
-3. **Dependencies**: Requires newer SDK versions
-
----
-
-## Risks and Mitigations
-
-| Risk | Mitigation |
-|------|------------|
-| SDK in preview (`2.0.0b2`) | Pin versions, test thoroughly |
-| YAML schema changes | Use schema validation, version pin |
-| Foundry service availability | Implement fallback to v1 agent |
-| Performance differences | Benchmark both versions |
+```bash
+# Test full agent with tool implementations
+python utils/demo_declarative_agents.py
+```
 
 ---
 
 ## Success Criteria
 
-1. ✅ Alert Triage Agent defined in YAML
-2. ✅ Agent persisted in Foundry (not recreated)
-3. ✅ Native AI Search tool for MITRE context
-4. ✅ Enterprise Memory for conversation history
-5. ✅ Demo runs successfully with new architecture
-6. ✅ All existing tests pass
-7. ✅ Documentation updated
+✅ **Phase 1-2:**
+- [ ] `agent-framework-declarative` installed successfully
+- [ ] YAML definitions created and validated
+- [ ] Dry-run agent loads without errors
+
+✅ **Phase 3-4:**
+- [ ] Declarative loader successfully loads agents from YAML
+- [ ] Tools correctly bound to agent
+- [ ] Agent processes alerts successfully
+
+✅ **Phase 5:**
+- [ ] Demo runs successfully
+- [ ] Agent is loaded once and reused
+- [ ] YAML changes can be applied by restarting (no code changes)
 
 ---
 
-## Appendix: Reference Links
+## Environment Setup
 
-- [Microsoft Foundry Agent Service Overview](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/overview)
-- [Declarative Agents in VS Code](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/develop/vs-code-agents)
-- [Foundry Agent Memory](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/agent-memory)
-- [Azure AI Projects SDK](https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme)
-- [Agent Framework GitHub](https://github.com/microsoft/agent-framework)
-- [Foundry Samples](https://github.com/azure-ai-foundry/foundry-samples)
-- [AgentSchema](https://github.com/microsoft/AgentSchema)
+### Required Environment Variables
+
+```bash
+# Azure OpenAI (for agent LLM)
+export AZURE_OPENAI_ENDPOINT="https://your-openai-resource.openai.azure.com/"
+export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o-mini"  # or your model
+
+# Optional: AI Search for MITRE knowledge base
+export AZURE_SEARCH_ENDPOINT="https://your-search-resource.search.windows.net"
+export AZURE_SEARCH_KEY="your-key"
+
+# Optional: Foundry project (for Phase 6)
+export AZURE_AI_PROJECT_ENDPOINT="https://your-project.services.ai.azure.com/..."
+```
+
+### Authentication
+
+```bash
+# Azure CLI authentication (recommended)
+az login
+```
+
+---
+
+## Key Differences from Current Implementation
+
+| Aspect | Current | After Refactor |
+|--------|---------|----------------|
+| Agent Definition | Python code | YAML file |
+| Tool Binding | Hardcoded in `__init__` | Dynamic from YAML |
+| Agent Lifecycle | Created at runtime | Loaded at startup |
+| Configuration Changes | Code edit + restart | YAML edit + restart |
+| Testing | Full execution | Dry-run mode available |
+| Experimentation | Requires coding | Edit YAML |
+
+---
+
+## References
+
+- **Declarative Agent Samples**: https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/declarative
+- **Workflow Samples**: https://github.com/microsoft/agent-framework/tree/main/workflow-samples
+- **Agent Framework Docs**: https://learn.microsoft.com/en-us/agent-framework/
+- **Azure AI Projects SDK**: https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme
+
+---
+
+## Next Steps
+
+1. ✅ Review and approve this plan
+2. 📋 Create Phase 1 implementation task
+3. 🔄 Iterative implementation (Phase 1 → Phase 2 → ...)
+4. 🧪 Test each phase before proceeding
+5. 📝 Document learnings and update examples
+
+---
+
+## Appendix: Example Workflow Samples
+
+From the Microsoft Agent Framework repository:
+
+- **CustomerSupport.yaml**: Multi-agent customer support workflow
+- **Marketing.yaml**: Marketing content creation workflow  
+- **MathChat.yaml**: Math problem solving with agent collaboration
+
+These provide patterns for:
+- Multi-agent workflows
+- Agent handoffs
+- Conditional execution
+- Tool orchestration
+
