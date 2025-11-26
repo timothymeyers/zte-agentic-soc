@@ -96,7 +96,7 @@ async def demo():
     print("  YAML Definition (alert_triage_agent.yaml)")
     print("    ↓")
     print("  AgentFactory (agent-framework-declarative)")
-    print("    ├─ Resolves Env.Variable references")
+    print("    ├─ Resolves =Env.Variable PowerFx references")
     print("    ├─ Configures MCP tools (Foundry IQ)")
     print("    └─ Creates ChatAgent")
     print("    ↓")

@@ -240,7 +240,7 @@ Respond with:
         if score_match:
             risk_score = min(100, max(0, int(score_match.group(1))))
         else:
-            # Alternative pattern: "Risk Score: 75"
+            # Alternative pattern: "75/100" or "85 / 100" format
             score_match = re.search(r'(\d+)\s*/\s*100', response_lower)
             if score_match:
                 risk_score = min(100, max(0, int(score_match.group(1))))
