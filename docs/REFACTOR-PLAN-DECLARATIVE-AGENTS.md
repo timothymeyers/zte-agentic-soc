@@ -247,12 +247,13 @@ class AlertTriageAgent:
    ```yaml
    # Alert Triage Agent - Foundry Declarative Definition
    # Reference: https://github.com/microsoft/agent-framework/tree/main/agent-samples/foundry
+   # Note: Environment variables use the Env.<variable> pattern per agent-framework-declarative
    
    name: alert-triage-agent
    description: AI-powered security alert triage agent for SOC operations
    
    model:
-     deployment: ${AZURE_OPENAI_DEPLOYMENT_NAME}
+     deployment: Env.AZURE_OPENAI_DEPLOYMENT_NAME
      parameters:
        temperature: 0.3
        max_tokens: 4096
@@ -306,17 +307,17 @@ class AlertTriageAgent:
        name: mitre_knowledge
        description: Search MITRE ATT&CK knowledge base for technique context
        knowledge_base:
-         index: ${AZURE_SEARCH_INDEX_NAME}
-         endpoint: ${AZURE_SEARCH_ENDPOINT}
+         index: Env.AZURE_SEARCH_INDEX_NAME
+         endpoint: Env.AZURE_SEARCH_ENDPOINT
      
      # Enterprise Memory - Alert Correlation
      - type: enterprise_memory
        name: alert_memory
        description: Access historical alert data for correlation analysis
        memory_store:
-         endpoint: ${AZURE_COSMOS_DB_ENDPOINT}
-         database: ${AZURE_COSMOS_DB_DATABASE}
-         container: ${AZURE_COSMOS_DB_CONTAINER}
+         endpoint: Env.AZURE_COSMOS_DB_ENDPOINT
+         database: Env.AZURE_COSMOS_DB_DATABASE
+         container: Env.AZURE_COSMOS_DB_CONTAINER
    
    metadata:
      version: "2.0.0"
