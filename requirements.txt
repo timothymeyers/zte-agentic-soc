@@ -4,7 +4,8 @@
 # Microsoft Agent Framework and Azure AI
 agent-framework #>=0.1.0
 agent-framework-azure-ai #>=0.1.0
-azure-ai-projects>=1.0.0
+agent-framework-declarative --pre  # Foundry declarative agent support
+azure-ai-projects>=2.0.0b2  # Foundry SDK v2 for agent features
 azure-identity>=1.15.0
 azure-ai-inference>=1.0.0b9
 
