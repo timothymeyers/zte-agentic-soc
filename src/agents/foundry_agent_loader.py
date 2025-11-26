@@ -37,17 +37,31 @@ class FoundryAgentLoader:
         self._agent: Optional[ChatAgent] = None
         self._agent_factory: Optional[AgentFactory] = None
 
+        # Ensure AZURE_AI_PROJECT_ENDPOINT is set (AgentFactory requirement)
+        # Map from AZURE_AI_FOUNDRY_PROJECT_ENDPOINT if not already set
+        if not os.getenv("AZURE_AI_PROJECT_ENDPOINT"):
+            foundry_endpoint = os.getenv("AZURE_AI_FOUNDRY_PROJECT_ENDPOINT")
+            if foundry_endpoint:
+                os.environ["AZURE_AI_PROJECT_ENDPOINT"] = foundry_endpoint
+                logger.debug(f"Set AZURE_AI_PROJECT_ENDPOINT from AZURE_AI_FOUNDRY_PROJECT_ENDPOINT")
+
         logger.debug(f"FoundryAgentLoader initialized with definitions_dir: {definitions_dir}")
 
     @property
     def agent_factory(self) -> AgentFactory:
         """Get or create AgentFactory instance."""
         if self._agent_factory is None:
+            # Use DefaultAzureCredential for authentication
+            # Note: AzureAIClient expects async_credential parameter
+            from azure.identity.aio import DefaultAzureCredential as AsyncDefaultAzureCredential
+            async_credential = AsyncDefaultAzureCredential()
+            
             self._agent_factory = AgentFactory(
                 env_file=self.env_file,
                 default_provider="AzureAIClient",
+                client_kwargs={"async_credential": async_credential},
             )
-            logger.info("AgentFactory initialized")
+            logger.info("AgentFactory initialized with async DefaultAzureCredential")
         return self._agent_factory
 
     def create_agent(
