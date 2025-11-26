@@ -77,7 +77,7 @@ def get_alert_triage_agent() -> Optional[FoundryNativeAgent]:
     """
     if _alert_triage_agent is None:
         raise RuntimeError(
-            "Alert Triage Agent not initialized. "
+            "alert-triage-agent not initialized. "
             "Call initialize_agents() at application startup first."
         )
     return _alert_triage_agent
