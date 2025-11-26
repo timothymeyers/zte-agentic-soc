@@ -120,14 +120,24 @@ class FoundryNativeAgent:
         instructions = self.agent_config.get('instructions', '')
         model_id = self.agent_config.get('model', {}).get('id', model_deployment)
         
-        logger.info(f"Creating agent: {agent_name} with model: {model_id}")
-        
         # For MVP: Create agent using existing framework
         # In full implementation, this would use Foundry's native agent creation
         # with tools configured from YAML (MCP, Code Interpreter, etc.)
         if project_endpoint:
             # Set environment variable for Azure AI Agent Framework
             os.environ["AZURE_AI_PROJECT_ENDPOINT"] = project_endpoint
+            
+            # Check if agent already exists in Foundry
+            # Note: In MVP, we're using Microsoft Agent Framework which doesn't persist agents
+            # In future with native Foundry APIs, we would check for existing agents:
+            # existing_agents = await self.project_client.agents.list_agents()
+            # existing_agent = next((a for a in existing_agents if a.name == agent_name), None)
+            # if existing_agent:
+            #     logger.info(f"✓ Found existing agent: {agent_name}")
+            #     self.agent = existing_agent
+            #     return
+            
+            logger.info(f"Creating agent: {agent_name} with model: {model_id}")
             
             self.agent = ChatAgent(
                 chat_client=AzureAIAgentClient(
