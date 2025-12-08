@@ -179,9 +179,8 @@ class TestFoundryAgentLoaderYAMLParsing:
 
         model = definition["model"]
         assert "id" in model
-        assert "options" in model
-        assert "temperature" in model["options"]
-        assert "max_tokens" in model["options"]
+        # Note: model options like temperature are not included for Azure AI Foundry agents
+        # as they are configured in the agent definition itself, not in the API request
 
     def test_yaml_mcp_tool_configuration(self):
         """Test MCP tool configuration in YAML."""

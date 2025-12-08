@@ -9,10 +9,8 @@ description: AI-powered security alert triage agent for SOC operations
 model:
   # Model deployment from Azure AI Foundry
   # Uses PowerFx syntax for environment variable resolution
+  # Note: Model options like temperature are configured in the agent definition, not here
   id: "=Env.AZURE_OPENAI_DEPLOYMENT_NAME"
-  options:
-    temperature: 0.3
-    max_tokens: 4096
 
 instructions: |
   You are an autonomous security analyst agent specializing in alert triage.
