@@ -193,7 +193,7 @@ class TestFoundryAgentLoaderYAMLParsing:
         mcp_tool = tools[0]
         assert mcp_tool["kind"] == "mcp"
         assert "name" in mcp_tool
-        assert "description" in mcp_tool
+        assert "serverName" in mcp_tool
         assert "url" in mcp_tool
         assert "connection" in mcp_tool
 
