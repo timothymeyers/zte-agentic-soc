@@ -175,6 +175,55 @@ The MVP follows a clear separation between infrastructure deployment and demonst
 
 **Output**: Demonstrable SOC scenarios showing multi-agent collaboration
 
+### Agent Design Philosophy: Instructions > Code
+
+**What Agents ARE**:
+- **Instruction sets**: Detailed markdown files with system prompts guiding LLM behavior
+- **LLM-powered reasoning**: The model performs analysis, decision-making, and generation
+- **Stateless participants**: Each invocation receives context, produces output via LLM
+
+**What Agents ARE NOT**:
+- ❌ **NOT** traditional Python classes with business logic methods
+- ❌ **NOT** deterministic algorithms (risk scoring, query parsing, etc.)
+- ❌ **NOT** rule engines or state machines
+- ❌ **NOT** tools/plugins (initially - deferred to future phases)
+
+**Example - Alert Triage Agent**:
+```markdown
+# Alert Triage Agent Instructions
+
+You are an expert SOC analyst specializing in alert triage and prioritization.
+
+## Your Role
+Analyze security alerts and provide risk assessment with clear reasoning.
+
+## Input Format
+You will receive security alerts in JSON format with fields:
+- alertId, timestamp, source, severity, description, entities (IPs, users, hosts)
+
+## Your Tasks
+1. Assess risk level (Critical/High/Medium/Low) based on:
+   - Severity indicators (data exfiltration, lateral movement, privilege escalation)
+   - Asset criticality (production systems, sensitive data repositories)
+   - User context (privileged accounts, external access)
+   - Historical patterns (repeat offender, known false positive source)
+
+2. Provide clear explanation of your risk assessment
+3. Identify any related alerts that should be correlated
+4. Suggest immediate next steps for SOC analyst
+
+## Output Format
+Provide your analysis as JSON:
+{
+  "riskLevel": "High",
+  "explanation": "This alert shows...",
+  "relatedAlerts": [...],
+  "nextSteps": [...]
+}
+```
+
+**The LLM handles ALL logic** - risk assessment, correlation detection, reasoning - based on these instructions.
+
 ### Design Rationale
 
 **Why Separate Deployment from Demonstration?**
@@ -230,30 +279,24 @@ src/
 ├── deployment/                      # Phase A: Infrastructure deployment (one-time)
 │   ├── __init__.py
 │   ├── deploy_agents.py             # Script to deploy v2 agents to Foundry using azure-ai-projects
-│   ├── agent_definitions/           # Agent instruction files (system prompts)
-│   │   ├── alert_triage_instructions.md
-│   │   ├── threat_hunting_instructions.md
-│   │   ├── incident_response_instructions.md
-│   │   ├── threat_intelligence_instructions.md
-│   │   └── manager_instructions.md  # Magentic manager instructions
-│   └── discover_agents.py           # Helper to discover/list deployed agents
+│   └── agent_definitions/           # Agent instruction files (system prompts) - THE CORE OF EACH AGENT
+│       ├── alert_triage_instructions.md     # Instructions for alert triage, risk scoring, prioritization
+│       ├── threat_hunting_instructions.md   # Instructions for threat hunting, query formulation, anomaly detection
+│       ├── incident_response_instructions.md # Instructions for containment, remediation recommendations
+│       ├── threat_intelligence_instructions.md # Instructions for briefings, IOC enrichment
+│       └── manager_instructions.md          # Magentic manager instructions (task decomposition, agent selection)
 ├── orchestration/                   # Phase B: Runtime orchestration (demonstration)
 │   ├── __init__.py
 │   ├── orchestrator.py              # Magentic orchestrator setup (PLUGIN POINT - change here for different orchestration)
-│   ├── agent_wrappers.py            # Wrap Foundry agents for Agent Framework
-│   ├── workflows.py                 # Pre-defined workflow scenarios (alert triage, threat hunt, incident response)
-│   └── event_handlers.py            # Handle workflow events (streaming, logging, metrics)
+│   └── workflows.py                 # Pre-defined workflow scenarios (alert triage, threat hunt, incident response)
 ├── data/                            # Data access layer
 │   ├── __init__.py
 │   ├── datasets.py                  # Mock data loader (GUIDE, Attack datasets)
-│   ├── streaming.py                 # Mock data streaming (configurable intervals, default 15s)
 │   └── scenarios.py                 # Pre-defined test scenarios for demonstration
 ├── shared/                          # Shared utilities
 │   ├── __init__.py
 │   ├── auth.py                      # Authentication (Managed Identity)
-│   ├── logging.py                   # Structured logging setup
-│   ├── metrics.py                   # Metrics collection
-│   └── schemas.py                   # Shared schemas (Pydantic models)
+│   └── logging.py                   # Structured logging setup
 └── demo/                            # Demo application (entry point)
     ├── __init__.py
     ├── main.py                      # Main demo script - runs workflows with mock data
@@ -333,7 +376,13 @@ docs/
 └── setup.md                         # Development setup guide
 ```
 
-**Structure Decision**: Web + API structure selected. Backend contains all agent logic, orchestration, and data access. API layer provides REST endpoints for human interaction (approval workflows, feedback submission, interactive hunting). Infrastructure defined as Bicep templates. Comprehensive testing structure with unit, integration, contract, and scenario tests. Schemas directory for formal input/output contracts. Documentation includes architecture diagrams, runbooks, and ADRs.
+**Structure Decision**: Minimal structure focused on agent instructions and orchestration. Agents are defined primarily by their instruction sets (markdown files), not custom Python logic. The LLM handles all reasoning, decision-making, and analysis based on the instructions. Python code is limited to:
+1. Deployment scripts (using azure-ai-projects SDK)
+2. Orchestration setup (using agent-framework magentic orchestrator)
+3. Mock data loading and streaming
+4. Demo scenarios and CLI
+
+NO custom business logic modules (risk scoring, query generation, etc.) - the LLM does this via instructions.
 
 ## Complexity Tracking
 
@@ -401,12 +450,17 @@ The existing Phase 1 artifacts need updates to reflect the new approach:
 Phase 2 will generate `tasks.md` with implementation work breakdown (not created by this plan command).
 
 Key implementation tasks will include:
-1. **Deployment Scripts**: Python scripts using `azure-ai-projects` to deploy v2 agents
-2. **Agent Instructions**: High-quality system prompts for each agent (Priority 1 focus)
+1. **Agent Instructions** (PRIORITY 1): High-quality instruction sets for each agent
+   - Alert Triage: Risk assessment, prioritization, correlation guidance
+   - Threat Hunting: Query formulation, anomaly detection patterns
+   - Incident Response: Containment recommendations, playbook guidance
+   - Threat Intelligence: Briefing structure, IOC enrichment
+   - Manager: Task decomposition, agent selection criteria
+2. **Deployment Scripts**: Simple Python scripts using `azure-ai-projects` to deploy v2 agents
 3. **Magentic Orchestrator**: Setup using `MagenticBuilder` from Agent Framework
-4. **Mock Data Streaming**: Configurable data streaming from GUIDE/Attack datasets
+4. **Mock Data Streaming**: Load and stream data from GUIDE/Attack datasets
 5. **Demo Scenarios**: End-to-end workflows showcasing multi-agent collaboration
-6. **Plugin Points**: Clear documentation and code structure for swapping orchestration
+6. **Plugin Points**: Clear documentation for swapping orchestration strategies
 
 ---
 
@@ -422,9 +476,11 @@ This updated plan incorporates new requirements from the issue:
 
 ### Implementation Focus
 1. **Instructions First**: MVP focuses on high-quality agent instructions; NO tools/integrations initially
-2. **Priority 1: Triage Agent**: Start with Alert Triage Agent as the primary focus
-3. **Mock Data**: Use provided datasets in `mock-data/` directory with configurable streaming
-4. **Demonstrable Quickly**: Two-phase approach enables faster demonstration without full infrastructure
+2. **LLM Does the Logic**: Agents use LLM reasoning for ALL decisions - no custom Python business logic
+3. **Priority 1: Triage Agent**: Start with Alert Triage Agent instruction quality as the primary focus
+4. **Mock Data**: Use provided datasets in `mock-data/` directory with configurable streaming
+5. **Demonstrable Quickly**: Two-phase approach enables faster demonstration without full infrastructure
+6. **Simple = Better**: Minimal Python code; maximum instruction clarity
 
 ### SDK Updates (Verified via Context7)
 1. **azure-ai-projects 2.0.0b2+**: Latest SDK for v2 agent deployment
