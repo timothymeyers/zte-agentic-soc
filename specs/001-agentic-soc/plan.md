@@ -7,22 +7,26 @@
 
 ## Summary
 
-The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry (AI Foundry) for agent implementation, Microsoft Agent Framework for orchestration, and follows constitutional principles for safe, explainable, autonomous-but-supervised operations.
+The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry (AI Foundry) for cloud-hosted agent deployment and Microsoft Agent Framework's magentic orchestrator for demonstration workflows, following constitutional principles for safe, explainable, autonomous-but-supervised operations.
 
-**Primary Technical Approach**: Build four specialized AI agents on Azure AI Foundry with Microsoft Agent Framework orchestration, using the GUIDE dataset (1.17M+ real security incidents) and Attack dataset (14K+ attack scenarios) for training and demonstration. Start with Alert Triage Agent (P1), then add Threat Hunting (P2), Incident Response (P2), and Threat Intelligence (P3), with agent collaboration orchestration (P1) enabling seamless multi-agent workflows.
+**Primary Technical Approach**: 
+1. **Infrastructure Deployment** (separate process): Use `azure-ai-projects` SDK to create/discover cloud-hosted v2 agents in Microsoft Foundry, deployed as part of infrastructure setup
+2. **MVP Demonstration**: Use Microsoft Agent Framework's magentic orchestrator to coordinate the deployed agents, using the GUIDE dataset (1.17M+ real security incidents) and Attack dataset (14K+ attack scenarios) for simulated scenarios
+3. **Initial Focus**: Solid agent instructions to direct behavior; tools and integrations deferred to later phases
+4. **Priority**: Alert Triage Agent (P1) first, then Threat Hunting (P2), Incident Response (P2), and Threat Intelligence (P3), with magentic orchestration (P1) enabling dynamic multi-agent collaboration
 
 ## Technical Context
 
 **Language/Version**: Python 3.11+ (primary), TypeScript/Node.js 20+ (for Teams integration)  
 **Primary Dependencies**: 
-- `azure-ai-projects` (AI Foundry Client SDK)
+- `azure-ai-projects` (Latest SDK for v2 agent deployment and management in Microsoft Foundry)
 - `azure-identity` (Managed Identity / Entra ID authentication)
-- `agent-framework` (Microsoft Agent Framework - replaces langchain/semantic-kernel)
+- `agent-framework` (Microsoft Agent Framework - magentic orchestrator for MVP demonstration)
 - `azure-monitor-opentelemetry` (observability)
 - `pydantic` (data validation and schema management)
-- `pandas` / `polars` (dataset processing)
-- `fastapi` (API endpoints for human approvals/feedback)
-- `azure-search-documents` (Azure AI Search for RAG knowledge base)
+- `pandas` / `polars` (dataset processing for mock data)
+- `fastapi` (API endpoints for human approvals/feedback - future phase)
+- `azure-search-documents` (Azure AI Search for RAG knowledge base - future phase)
 
 **AI Models** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for full analysis):
 - **MVP**: GPT-4.1-mini for all agents - cost-optimized ($190/month, avoids deprecated GPT-4o-mini)
@@ -61,7 +65,10 @@ The Agentic SOC MVP is an AI-first security operations platform that uses specia
 - No Azure Logic Apps (per issue requirements)
 - No Azure Durable Functions (per issue requirements)
 - Mock data delivery in configurable "realtime" intervals (default: 15 seconds)
-- Human approval required for high-risk actions (risk-scored threshold)
+- Initial MVP: Focus on agent instructions only; NO tools or integrations initially
+- Use Microsoft Agent Framework's magentic orchestrator for MVP (make it obvious where this would be changed)
+- Separate infrastructure deployment (agent creation) from demonstration (agent orchestration)
+- Human approval required for high-risk actions (risk-scored threshold - future phase)
 - All agent decisions MUST include natural language explanations
 
 **Scale/Scope**: 
