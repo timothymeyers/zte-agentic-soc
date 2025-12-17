@@ -132,6 +132,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
    - Threat Hunting Agent with instructions for query generation and anomaly detection
    - Incident Response Agent with instructions for containment recommendations
    - Threat Intelligence Agent with instructions for threat briefing generation
+   - Manager/Coordinator Agent with instructions for task coordination and agent selection
 3. Each agent is created with:
    - Clear name (e.g., "AlertTriageAgent")
    - Detailed instructions (system prompt defining behavior)
@@ -148,28 +149,32 @@ The MVP follows a clear separation between infrastructure deployment and demonst
 **Tools**: Microsoft Agent Framework with magentic orchestrator
 
 **Process**:
-1. Discover deployed agents using `AIProjectClient.agents.get_agent()` or list operations
-2. Wrap agent references in Agent Framework agent wrappers
-3. Create a manager agent - this is a ChatAgent you create with instructions for task coordination:
+1. Discover deployed agents using `AIProjectClient.agents.get_agent()` or list operations:
    ```python
-   from agent_framework import ChatAgent, MagenticBuilder
-   from agent_framework.openai import OpenAIChatClient
+   from azure.ai.projects import AIProjectClient
+   from azure.identity import DefaultAzureCredential
    
-   # Create manager agent (you must create this - not provided by framework)
-   manager_agent = ChatAgent(
-       name="SOC_Coordinator",
-       chat_client=OpenAIChatClient(model_id="gpt-4.1-mini"),
-       instructions="""You coordinate SOC agents. For each security task:
-       1. ALWAYS start with the Triage agent to assess the alert
-       2. Based on triage results, delegate to appropriate agents:
-          - High/Critical risks → Incident Response agent
-          - Investigation needed → Threat Hunting agent
-          - Context needed → Threat Intelligence agent
-       3. Synthesize findings into actionable recommendations
-       """
+   # Connect to Foundry and discover deployed agents
+   project_client = AIProjectClient(
+       endpoint=os.environ["PROJECT_ENDPOINT"],
+       credential=DefaultAzureCredential()
    )
    
-   # Build magentic workflow with the manager
+   # Get all deployed agents (including manager)
+   triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
+   hunting_agent = project_client.agents.get_agent(agent_name="ThreatHuntingAgent")
+   response_agent = project_client.agents.get_agent(agent_name="IncidentResponseAgent")
+   intel_agent = project_client.agents.get_agent(agent_name="ThreatIntelligenceAgent")
+   manager_agent = project_client.agents.get_agent(agent_name="SOC_Coordinator")
+   ```
+
+2. Wrap discovered Foundry agents in Agent Framework wrappers (if needed for magentic orchestration)
+
+3. Build magentic workflow using the deployed manager agent:
+   ```python
+   from agent_framework import MagenticBuilder
+   
+   # Build magentic workflow with discovered agents
    workflow = (
        MagenticBuilder()
        .participants(
@@ -179,7 +184,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
            intel=intel_agent
        )
        .with_standard_manager(
-           agent=manager_agent,  # Pass your custom manager agent
+           agent=manager_agent,  # Use the deployed manager agent from Foundry
            max_round_count=10,
            max_stall_count=3
        )
@@ -187,8 +192,8 @@ The MVP follows a clear separation between infrastructure deployment and demonst
    )
    ```
 4. Stream mock data (GUIDE/Attack datasets) to trigger workflows
-5. Magentic manager dynamically selects which agent to invoke based on task context and manager instructions
-6. **Alternative approach for guaranteed triage-first**: Implement custom manager that always routes to triage agent first, then uses magentic orchestration for subsequent steps
+5. Manager agent (deployed in Phase A with coordination instructions) dynamically selects which agent to invoke based on task context
+6. **Note on triage-first behavior**: Manager agent's deployed instructions enforce "ALWAYS start with Triage agent" - no runtime ChatAgent creation needed
 
 **Output**: Demonstrable SOC scenarios showing multi-agent collaboration
 
@@ -257,31 +262,37 @@ Provide your analysis as JSON:
 - **Triage-First Pattern**: Manager instructions can enforce "always start with triage" behavior, or implement custom manager for guaranteed routing
 
 **Ensuring Triage Agent Goes First**:
-Two approaches are available:
+Since the manager agent is deployed as a Foundry v2 agent (same as other agents), triage-first behavior is controlled via its deployed instructions:
 
-1. **Via Manager Instructions** (Recommended for MVP - simpler):
-   - Manager agent instructions explicitly state "ALWAYS start with the Triage agent"
-   - Relies on LLM to follow instructions consistently
-   - Example: "For each security task: 1. ALWAYS start with the Triage agent..."
-   - Pro: Simpler implementation, leverages LLM reasoning
-   - Con: Depends on LLM compliance with instructions
+1. **Via Manager Agent Instructions** (Recommended for MVP - simpler):
+   - Manager agent deployed with instructions that explicitly state "ALWAYS start with the Triage agent"
+   - Instructions baked into the deployed agent at infrastructure deployment time (Phase A)
+   - Relies on LLM to follow its own instructions consistently
+   - Example instruction content in `manager_instructions.md`:
+     ```markdown
+     You coordinate SOC agents. For each security task:
+     1. ALWAYS start with the Triage agent to assess the alert
+     2. Based on triage results, delegate to appropriate agents...
+     ```
+   - Pro: Simpler implementation, consistent with agent-as-instruction philosophy, leverages LLM reasoning
+   - Con: Depends on LLM compliance with instructions (though this is true for all agents)
 
-2. **Custom Manager Implementation** (Production option - guaranteed):
-   - Extend `MagenticManagerBase` with custom routing logic
-   - Hardcode triage agent as first step, then use magentic for remaining agents
-   - Guarantees triage always executes first
+2. **Custom Manager Implementation** (Advanced option if LLM routing insufficient):
+   - Deploy a standard manager agent, but wrap it with custom orchestration logic at runtime
+   - Custom wrapper can enforce triage-first before delegating to magentic manager
    - Example:
      ```python
-     class TriageFirstManager(MagenticManagerBase):
-         async def plan(self, context: MagenticContext) -> ChatMessage:
-             # Force triage agent first
-             if not context.has_invoked("triage"):
-                 return ChatMessage(text="Invoke triage agent")
-             # Then use standard magentic logic for remaining agents
-             return await super().plan(context)
+     async def run_workflow(task):
+         # Force triage first
+         triage_result = await triage_agent.run(task)
+         
+         # Then use magentic orchestration for remaining agents
+         workflow_result = await workflow.run(
+             f"Based on triage: {triage_result}, proceed with investigation"
+         )
      ```
-   - Pro: Guaranteed execution order
-   - Con: More complex, requires custom manager implementation
+   - Pro: Guaranteed execution order without custom manager agent
+   - Con: Adds orchestration wrapper code outside the agent paradigm
 
 **Where to Change Orchestration Strategy** (Explicit Plugin Point):
 - File: `src/orchestration/orchestrator.py`
