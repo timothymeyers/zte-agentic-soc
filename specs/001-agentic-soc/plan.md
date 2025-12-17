@@ -7,22 +7,26 @@
 
 ## Summary
 
-The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry (AI Foundry) for agent implementation, Microsoft Agent Framework for orchestration, and follows constitutional principles for safe, explainable, autonomous-but-supervised operations.
+The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry (AI Foundry) for cloud-hosted agent deployment and Microsoft Agent Framework's magentic orchestrator for demonstration workflows, following constitutional principles for safe, explainable, autonomous-but-supervised operations.
 
-**Primary Technical Approach**: Build four specialized AI agents on Azure AI Foundry with Microsoft Agent Framework orchestration, using the GUIDE dataset (1.17M+ real security incidents) and Attack dataset (14K+ attack scenarios) for training and demonstration. Start with Alert Triage Agent (P1), then add Threat Hunting (P2), Incident Response (P2), and Threat Intelligence (P3), with agent collaboration orchestration (P1) enabling seamless multi-agent workflows.
+**Primary Technical Approach**: 
+1. **Infrastructure Deployment** (separate process): Use `azure-ai-projects` SDK to create/discover cloud-hosted v2 agents in Microsoft Foundry, deployed as part of infrastructure setup
+2. **MVP Demonstration**: Use Microsoft Agent Framework's magentic orchestrator to coordinate the deployed agents, using the GUIDE dataset (1.17M+ real security incidents) and Attack dataset (14K+ attack scenarios) for simulated scenarios
+3. **Initial Focus**: Solid agent instructions to direct behavior; tools and integrations deferred to later phases
+4. **Priority**: Alert Triage Agent (P1) first, then Threat Hunting (P2), Incident Response (P2), and Threat Intelligence (P3), with magentic orchestration (P1) enabling dynamic multi-agent collaboration
 
 ## Technical Context
 
 **Language/Version**: Python 3.11+ (primary), TypeScript/Node.js 20+ (for Teams integration)  
 **Primary Dependencies**: 
-- `azure-ai-projects` (AI Foundry Client SDK)
+- `azure-ai-projects` (Latest SDK for v2 agent deployment and management in Microsoft Foundry)
 - `azure-identity` (Managed Identity / Entra ID authentication)
-- `agent-framework` (Microsoft Agent Framework - replaces langchain/semantic-kernel)
+- `agent-framework` (Microsoft Agent Framework - magentic orchestrator for MVP demonstration)
 - `azure-monitor-opentelemetry` (observability)
 - `pydantic` (data validation and schema management)
-- `pandas` / `polars` (dataset processing)
-- `fastapi` (API endpoints for human approvals/feedback)
-- `azure-search-documents` (Azure AI Search for RAG knowledge base)
+- `pandas` / `polars` (dataset processing for mock data)
+- `fastapi` (API endpoints for human approvals/feedback - future phase)
+- `azure-search-documents` (Azure AI Search for RAG knowledge base - future phase)
 
 **AI Models** (see [MODEL-SELECTION-AOA.md](./MODEL-SELECTION-AOA.md) for full analysis):
 - **MVP**: GPT-4.1-mini for all agents - cost-optimized ($190/month, avoids deprecated GPT-4o-mini)
@@ -61,7 +65,10 @@ The Agentic SOC MVP is an AI-first security operations platform that uses specia
 - No Azure Logic Apps (per issue requirements)
 - No Azure Durable Functions (per issue requirements)
 - Mock data delivery in configurable "realtime" intervals (default: 15 seconds)
-- Human approval required for high-risk actions (risk-scored threshold)
+- Initial MVP: Focus on agent instructions only; NO tools or integrations initially
+- Use Microsoft Agent Framework's magentic orchestrator for MVP (make it obvious where this would be changed)
+- Separate infrastructure deployment (agent creation) from demonstration (agent orchestration)
+- Human approval required for high-risk actions (risk-scored threshold - future phase)
 - All agent decisions MUST include natural language explanations
 
 **Scale/Scope**: 
@@ -108,6 +115,195 @@ Verify compliance with `.specify/memory/constitution.md`:
 
 *All constitutional principles are satisfied for the MVP scope.*
 
+## Implementation Approach: Two-Phase Architecture
+
+The MVP follows a clear separation between infrastructure deployment and demonstration orchestration:
+
+### Phase A: Infrastructure Deployment (One-time Setup)
+
+**Purpose**: Create and configure cloud-hosted v2 agents in Microsoft Foundry
+
+**Tools**: `azure-ai-projects` SDK (version 2.0.0b2 or later)
+
+**Process**:
+1. Connect to existing Azure AI Foundry workspace via environment variables (`PROJECT_ENDPOINT`, `MODEL_DEPLOYMENT_NAME`) or deploy new workspace if not available
+2. Use `AIProjectClient.agents.create_version()` to create persistent v2 agents:
+   - Alert Triage Agent with instructions for risk scoring and prioritization
+   - Threat Hunting Agent with instructions for query generation and anomaly detection
+   - Incident Response Agent with instructions for containment recommendations
+   - Threat Intelligence Agent with instructions for threat briefing generation
+   - Manager/Coordinator Agent with instructions for task coordination and agent selection
+3. Each agent is created with:
+   - Clear name (e.g., "AlertTriageAgent")
+   - Detailed instructions (system prompt defining behavior)
+   - Model deployment reference (e.g., "gpt-4.1-mini")
+   - NO tools initially (focus on instruction quality) - tools will be added in later phases
+4. Agents persist in Azure AI Foundry and can be discovered by name/ID
+
+**Output**: Cloud-hosted agents that can be referenced by name in demonstration code
+
+### Phase B: MVP Demonstration (Runtime Orchestration)
+
+**Purpose**: Orchestrate the deployed agents to demonstrate SOC workflows
+
+**Tools**: Microsoft Agent Framework with magentic orchestrator
+
+**Process**:
+1. Discover deployed agents using `AIProjectClient.agents.get_agent()` or list operations:
+   ```python
+   from azure.ai.projects import AIProjectClient
+   from azure.identity import DefaultAzureCredential
+   
+   # Connect to Foundry and discover deployed agents
+   project_client = AIProjectClient(
+       endpoint=os.environ["PROJECT_ENDPOINT"],
+       credential=DefaultAzureCredential()
+   )
+   
+   # Get all deployed agents (including manager)
+   triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
+   hunting_agent = project_client.agents.get_agent(agent_name="ThreatHuntingAgent")
+   response_agent = project_client.agents.get_agent(agent_name="IncidentResponseAgent")
+   intel_agent = project_client.agents.get_agent(agent_name="ThreatIntelligenceAgent")
+   manager_agent = project_client.agents.get_agent(agent_name="SOC_Coordinator")
+   ```
+
+2. Wrap discovered Foundry agents in Agent Framework wrappers (if needed for magentic orchestration)
+
+3. Build magentic workflow using the deployed manager agent:
+   ```python
+   from agent_framework import MagenticBuilder
+   
+   # Build magentic workflow with discovered agents
+   workflow = (
+       MagenticBuilder()
+       .participants(
+           triage=triage_agent,
+           hunting=hunting_agent,
+           response=response_agent,
+           intel=intel_agent
+       )
+       .with_standard_manager(
+           agent=manager_agent,  # Use the deployed manager agent from Foundry
+           max_round_count=10,
+           max_stall_count=3
+       )
+       .build()
+   )
+   ```
+4. Stream mock data (GUIDE/Attack datasets) to trigger workflows
+5. Manager agent (deployed in Phase A with coordination instructions) dynamically selects which agent to invoke based on task context
+6. **Note on triage-first behavior**: Manager agent's deployed instructions enforce "ALWAYS start with Triage agent" - no runtime ChatAgent creation needed
+
+**Output**: Demonstrable SOC scenarios showing multi-agent collaboration
+
+### Agent Design Philosophy: Instructions > Code
+
+**What Agents ARE**:
+- **Instruction sets**: Detailed markdown files with system prompts guiding LLM behavior
+- **LLM-powered reasoning**: The model performs analysis, decision-making, and generation
+- **Stateless participants**: Each invocation receives context, produces output via LLM
+
+**What Agents ARE NOT**:
+- ❌ **NOT** traditional Python classes with business logic methods
+- ❌ **NOT** deterministic algorithms (risk scoring, query parsing, etc.)
+- ❌ **NOT** rule engines or state machines
+- ❌ **NOT** tools/plugins (initially - deferred to future phases)
+
+**Example - Alert Triage Agent**:
+```markdown
+# Alert Triage Agent Instructions
+
+You are an expert SOC analyst specializing in alert triage and prioritization.
+
+## Your Role
+Analyze security alerts and provide risk assessment with clear reasoning.
+
+## Input Format
+You will receive security alerts in JSON format with fields:
+- alertId, timestamp, source, severity, description, entities (IPs, users, hosts)
+
+## Your Tasks
+1. Assess risk level (Critical/High/Medium/Low) based on:
+   - Severity indicators (data exfiltration, lateral movement, privilege escalation)
+   - Asset criticality (production systems, sensitive data repositories)
+   - User context (privileged accounts, external access)
+   - Historical patterns (repeat offender, known false positive source)
+
+2. Provide clear explanation of your risk assessment
+3. Identify any related alerts that should be correlated
+4. Suggest immediate next steps for SOC analyst
+
+## Output Format
+Provide your analysis as JSON:
+{
+  "riskLevel": "High",
+  "explanation": "This alert shows...",
+  "relatedAlerts": [...],
+  "nextSteps": [...]
+}
+```
+
+**The LLM handles ALL logic** - risk assessment, correlation detection, reasoning - based on these instructions.
+
+### Design Rationale
+
+**Why Separate Deployment from Demonstration?**
+- **Infrastructure-as-Code**: Agent definitions are versioned and deployed like any other cloud resource
+- **Reusability**: Same agents can be orchestrated in different patterns (sequential, concurrent, magentic)
+- **Scalability**: Deployed agents can handle concurrent requests from multiple orchestration instances
+- **Flexibility**: Easy to swap orchestration strategies without redeploying agents
+
+**Why Magentic Orchestrator for MVP?**
+- **Dynamic Coordination**: Manager agent selects next agent based on evolving context (vs. hardcoded sequences)
+- **Handles Uncertainty**: Well-suited for security scenarios where solution path is not predetermined
+- **Human-in-the-Loop**: Built-in support for approval gates and stall intervention
+- **Future-Proof**: Clear extension point - replace magentic with custom orchestrator in production
+- **Triage-First Pattern**: Manager instructions can enforce "always start with triage" behavior, or implement custom manager for guaranteed routing
+
+**Ensuring Triage Agent Goes First**:
+Since the manager agent is deployed as a Foundry v2 agent (same as other agents), triage-first behavior is controlled via its deployed instructions:
+
+1. **Via Manager Agent Instructions** (Recommended for MVP - simpler):
+   - Manager agent deployed with instructions that explicitly state "ALWAYS start with the Triage agent"
+   - Instructions baked into the deployed agent at infrastructure deployment time (Phase A)
+   - Relies on LLM to follow its own instructions consistently
+   - Example instruction content in `manager_instructions.md`:
+     ```markdown
+     You coordinate SOC agents. For each security task:
+     1. ALWAYS start with the Triage agent to assess the alert
+     2. Based on triage results, delegate to appropriate agents...
+     ```
+   - Pro: Simpler implementation, consistent with agent-as-instruction philosophy, leverages LLM reasoning
+   - Con: Depends on LLM compliance with instructions (though this is true for all agents)
+
+2. **Custom Manager Implementation** (Advanced option if LLM routing insufficient):
+   - Deploy a standard manager agent, but wrap it with custom orchestration logic at runtime
+   - Custom wrapper can enforce triage-first before delegating to magentic manager
+   - Example:
+     ```python
+     async def run_workflow(task):
+         # Force triage first
+         triage_result = await triage_agent.run(task)
+         
+         # Then use magentic orchestration for remaining agents
+         workflow_result = await workflow.run(
+             f"Based on triage: {triage_result}, proceed with investigation"
+         )
+     ```
+   - Pro: Guaranteed execution order without custom manager agent
+   - Con: Adds orchestration wrapper code outside the agent paradigm
+
+**Where to Change Orchestration Strategy** (Explicit Plugin Point):
+- File: `src/orchestration/orchestrator.py`
+- Function: `create_workflow()` 
+- Current: Uses `MagenticBuilder` from Agent Framework
+- Future Options:
+  - Sequential orchestration for predictable workflows
+  - Concurrent orchestration for parallel agent execution
+  - Custom orchestrator implementing business-specific logic
+  - Production: Replace with Azure Durable Functions or Logic Apps if scale requires
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -136,58 +332,35 @@ specs/001-agentic-soc/
 ```text
 # Backend services and agents
 src/
-├── agents/                          # AI agent implementations
-│   ├── alert_triage/                # Alert Triage Agent (P1)
-│   │   ├── __init__.py
-│   │   ├── agent.py                 # Main agent logic (AI Foundry)
-│   │   ├── models.py                # Input/output models (Pydantic)
-│   │   ├── scoring.py               # Risk scoring logic
-│   │   └── feedback.py              # Analyst feedback processing
-│   ├── threat_hunting/              # Threat Hunting Agent (P2)
-│   │   ├── __init__.py
-│   │   ├── agent.py                 # Main agent logic
-│   │   ├── query_generator.py       # KQL query generation
-│   │   └── anomaly_detector.py      # Anomaly detection models
-│   ├── incident_response/           # Incident Response Agent (P2)
-│   │   ├── __init__.py
-│   │   ├── agent.py                 # Main agent logic
-│   │   ├── playbooks.py             # Response playbook execution
-│   │   └── approval.py              # Human approval workflows
-│   └── threat_intelligence/         # Threat Intelligence Agent (P3)
-│       ├── __init__.py
-│       ├── agent.py                 # Main agent logic
-│       ├── enrichment.py            # IOC enrichment
-│       └── briefing.py              # Daily briefing generation
-├── orchestration/                   # Agent orchestration layer
+├── deployment/                      # Phase A: Infrastructure deployment (one-time)
 │   ├── __init__.py
-│   ├── orchestrator.py              # Microsoft Agent Framework orchestrator
-│   ├── event_handlers.py            # Event-driven triggers
-│   └── workflows.py                 # Multi-agent workflows
+│   ├── deploy_agents.py             # Script to deploy v2 agents to Foundry using azure-ai-projects
+│   └── agent_definitions/           # Agent instruction files (system prompts) - THE CORE OF EACH AGENT
+│       ├── alert_triage_instructions.md     # Instructions for alert triage, risk scoring, prioritization
+│       ├── threat_hunting_instructions.md   # Instructions for threat hunting, query formulation, anomaly detection
+│       ├── incident_response_instructions.md # Instructions for containment, remediation recommendations
+│       ├── threat_intelligence_instructions.md # Instructions for briefings, IOC enrichment
+│       └── manager_instructions.md          # Manager agent instructions (enforces triage-first, agent selection)
+├── orchestration/                   # Phase B: Runtime orchestration (demonstration)
+│   ├── __init__.py
+│   ├── orchestrator.py              # Magentic orchestrator setup (PLUGIN POINT - change here for different orchestration)
+│   └── workflows.py                 # Pre-defined workflow scenarios (alert triage, threat hunt, incident response)
 ├── data/                            # Data access layer
 │   ├── __init__.py
-│   ├── sentinel.py                  # Sentinel API client (mock for MVP)
-│   ├── fabric.py                    # Fabric query interface (mock for MVP)
-│   ├── cosmos.py                    # Cosmos DB client (state, config, audit)
-│   └── datasets.py                  # Mock data loader (GUIDE, Attack datasets)
-├── api/                             # REST API for human interaction
-│   ├── __init__.py
-│   ├── main.py                      # FastAPI app entry point
-│   ├── routes/                      # API routes
-│   │   ├── approval.py              # Approval workflows
-│   │   ├── feedback.py              # Analyst feedback
-│   │   └── hunting.py               # Interactive hunting
-│   └── models.py                    # API request/response models
+│   ├── datasets.py                  # Mock data loader (GUIDE, Attack datasets)
+│   └── scenarios.py                 # Pre-defined test scenarios for demonstration
 ├── shared/                          # Shared utilities
 │   ├── __init__.py
 │   ├── auth.py                      # Authentication (Managed Identity)
-│   ├── logging.py                   # Structured logging setup
-│   ├── metrics.py                   # Metrics collection
-│   └── schemas.py                   # Shared schemas (Pydantic models)
-└── mock/                            # Mock service implementations
+│   └── logging.py                   # Structured logging setup
+└── demo/                            # Demo application (entry point)
     ├── __init__.py
-    ├── sentinel_mock.py             # Mock Sentinel API
-    ├── defender_mock.py             # Mock Defender XDR API
-    └── stream.py                    # Mock data streaming (15s intervals)
+    ├── main.py                      # Main demo script - runs workflows with mock data
+    ├── scenarios/                   # Demo scenarios
+    │   ├── scenario_01_alert_triage.py
+    │   ├── scenario_02_threat_hunt.py
+    │   └── scenario_03_incident_response.py
+    └── cli.py                       # CLI for running demos and managing agents
 
 # Infrastructure as Code
 infra/
@@ -259,7 +432,13 @@ docs/
 └── setup.md                         # Development setup guide
 ```
 
-**Structure Decision**: Web + API structure selected. Backend contains all agent logic, orchestration, and data access. API layer provides REST endpoints for human interaction (approval workflows, feedback submission, interactive hunting). Infrastructure defined as Bicep templates. Comprehensive testing structure with unit, integration, contract, and scenario tests. Schemas directory for formal input/output contracts. Documentation includes architecture diagrams, runbooks, and ADRs.
+**Structure Decision**: Minimal structure focused on agent instructions and orchestration. Agents are defined primarily by their instruction sets (markdown files), not custom Python logic. The LLM handles all reasoning, decision-making, and analysis based on the instructions. Python code is limited to:
+1. Deployment scripts (using azure-ai-projects SDK)
+2. Orchestration setup (using agent-framework magentic orchestrator)
+3. Mock data loading and streaming
+4. Demo scenarios and CLI
+
+NO custom business logic modules (risk scoring, query generation, etc.) - the LLM does this via instructions.
 
 ## Complexity Tracking
 
@@ -267,59 +446,112 @@ docs/
 
 No constitutional violations requiring justification. All complexity is inherent to the problem domain (multi-agent coordination, security operations, real-time event processing) and aligned with constitutional principles.
 
-## Phase 0: Research & Technology Decisions (Next Step)
+## Phase 0: Research & Technology Decisions (Completed - Update Required)
 
-The next phase will generate `research.md` covering:
+The existing `research.md` needs updates to reflect the new approach. Key areas requiring updates:
 
-1. **Microsoft Foundry / AI Foundry Integration**:
-   - AI Foundry Client SDK usage patterns
-   - Agent deployment models (Container Apps vs Functions)
-   - Model selection (GPT-4 for reasoning, embeddings for similarity)
+1. **Azure AI Projects SDK (azure-ai-projects 2.0.0b2+)**:
+   - ✅ Already covered: Basic agent creation patterns
+   - ⚠️ **UPDATE NEEDED**: V2 agent deployment with `AIProjectClient.agents.create_version()`
+   - ⚠️ **UPDATE NEEDED**: Agent discovery and listing patterns
+   - ⚠️ **UPDATE NEEDED**: Separation of deployment from orchestration
+   - Source: Context7 `/websites/azuresdkdocs_z19_web_core_windows_net_python_azure-ai-projects_2_0_0b2`
 
-2. **Microsoft Agent Framework**:
-   - Agent-to-agent communication patterns
-   - State management and context passing
-   - Event-driven orchestration with Event Hubs
+2. **Microsoft Agent Framework - Magentic Orchestration**:
+   - ⚠️ **NEW SECTION NEEDED**: Magentic orchestration patterns
+   - Key concepts: Dynamic agent selection, manager agent, progress tracking
+   - Configuration: `MagenticBuilder`, `with_standard_manager()`, participant agents
+   - Human-in-the-loop: Plan review, tool approval, stall intervention
+   - Event streaming: `AgentRunUpdateEvent` for real-time updates
+   - Source: Context7 `/microsoft/agent-framework` and Microsoft Learn docs
 
-3. **Security Copilot Integration** (for production):
-   - Copilot API integration patterns
-   - Skills development for custom agents
-   - Prompt engineering best practices
+3. **Agent Instructions (System Prompts)**:
+   - ⚠️ **NEW SECTION NEEDED**: Best practices for writing agent instructions
+   - Focus area for MVP: Quality instructions > tools/integrations
+   - Alert Triage: Risk scoring, prioritization, correlation logic
+   - Threat Hunting: Query generation guidance, anomaly detection patterns
+   - Incident Response: Containment recommendations, playbook adherence
+   - Threat Intelligence: Briefing structure, IOC enrichment patterns
+   - Manager Agent: Task decomposition, agent selection criteria
 
-4. **KQL Query Patterns**:
-   - Natural language to KQL translation
-   - Common threat hunting queries
-   - Advanced hunting query optimization
+4. **Mock Data Strategy**:
+   - ✅ Already covered: GUIDE and Attack datasets
+   - ⚠️ **UPDATE NEEDED**: Streaming simulation for real-time demos
+   - ⚠️ **UPDATE NEEDED**: Scenario-based test data for each workflow
 
-5. **Mock Data Strategy**:
-   - GUIDE dataset transformation to Sentinel format
-   - Attack dataset usage for playbook generation
-   - Configurable streaming intervals (default 15s)
-   - Checkpoint-based replay for reproducible demos
+5. **Orchestration Plugin Points**:
+   - ⚠️ **NEW SECTION NEEDED**: How to swap orchestration strategies
+   - Current: Magentic orchestrator (dynamic, manager-driven)
+   - Alternatives: Sequential, concurrent, custom orchestrators
+   - Migration path: Agent Framework → Azure Durable Functions/Logic Apps
 
-6. **Threat Intelligence Sources**:
-   - MITRE ATT&CK technique mappings
-   - IOC enrichment patterns
-   - Threat briefing generation
+## Phase 1: Design Artifacts (Completed - Update Required)
 
-7. **Observability Patterns**:
-   - Structured logging with Application Insights
-   - Distributed tracing with correlation IDs
-   - Agent performance metrics and dashboards
+The existing Phase 1 artifacts need updates to reflect the new approach:
 
-## Phase 1: Design Artifacts (Future)
-
-Phase 1 will generate:
-
-- `data-model.md`: Entity definitions (Alert, Incident, Finding, IOC, Agent State)
-- `contracts/`: OpenAPI specs and JSON schemas for all agent interfaces
-- `quickstart.md`: Step-by-step setup and demo instructions
-- Agent context updates via `update-agent-context.sh`
+- ✅ `data-model.md`: Already completed - covers Alert, Incident, Finding, IOC, Agent State
+- ⚠️ `contracts/`: **UPDATE NEEDED** - Add agent instruction templates as "contracts"
+  - Current: JSON schemas for agent I/O
+  - Add: Markdown files with agent instruction templates
+  - Add: Manager agent instruction template
+- ⚠️ `quickstart.md`: **MAJOR UPDATE NEEDED** - Rewrite for two-phase approach
+  - Section 1: Deploy agents to Foundry (Phase A)
+  - Section 2: Run demonstration workflows (Phase B)
+  - Section 3: Customize agent instructions
+  - Section 4: Change orchestration strategy (plugin point)
+- [ ] Agent context updates via `update-agent-context.sh` - TO BE EXECUTED
 
 ## Phase 2: Implementation Tasks (Future)
 
 Phase 2 will generate `tasks.md` with implementation work breakdown (not created by this plan command).
 
+Key implementation tasks will include:
+1. **Agent Instructions** (PRIORITY 1): High-quality instruction sets for each agent
+   - Alert Triage: Risk assessment, prioritization, correlation guidance
+   - Threat Hunting: Query formulation, anomaly detection patterns
+   - Incident Response: Containment recommendations, playbook guidance
+   - Threat Intelligence: Briefing structure, IOC enrichment
+   - Manager: Task decomposition, agent selection criteria
+2. **Deployment Scripts**: Simple Python scripts using `azure-ai-projects` to deploy v2 agents
+3. **Magentic Orchestrator**: Setup using `MagenticBuilder` from Agent Framework
+4. **Mock Data Streaming**: Load and stream data from GUIDE/Attack datasets
+5. **Demo Scenarios**: End-to-end workflows showcasing multi-agent collaboration
+6. **Plugin Points**: Clear documentation for swapping orchestration strategies
+
 ---
 
-**Status**: Phase 0 (Research) is the next step. Run Phase 0 workflow to generate `research.md`.
+## Key Changes from Original Plan
+
+This updated plan incorporates new requirements from the issue:
+
+### Architecture Changes
+1. **Deployment Separation**: Infrastructure deployment (azure-ai-projects) is now separate from demonstration orchestration (agent-framework)
+2. **V2 Agents**: Use cloud-hosted persistent agents created with `AIProjectClient.agents.create_version()`
+3. **Magentic Orchestration**: Replace generic "Microsoft Agent Framework orchestration" with specific magentic orchestrator pattern
+4. **Plugin Point**: Explicit documentation of where/how to change orchestration strategy
+
+### Implementation Focus
+1. **Instructions First**: MVP focuses on high-quality agent instructions; NO tools/integrations initially
+2. **LLM Does the Logic**: Agents use LLM reasoning for ALL decisions - no custom Python business logic
+3. **Priority 1: Triage Agent**: Start with Alert Triage Agent instruction quality as the primary focus
+4. **Mock Data**: Use provided datasets in `mock-data/` directory with configurable streaming
+5. **Demonstrable Quickly**: Two-phase approach enables faster demonstration without full infrastructure
+6. **Simple = Better**: Minimal Python code; maximum instruction clarity
+
+### SDK Updates (Verified via Context7)
+1. **azure-ai-projects 2.0.0b2+**: Latest SDK for v2 agent deployment
+2. **agent-framework**: Microsoft Agent Framework with magentic orchestration capabilities
+3. **Foundry Agents**: Persistent, cloud-hosted agents vs. ephemeral local instances
+
+### Documentation Updates Needed
+1. **research.md**: Add magentic orchestration section, update azure-ai-projects patterns
+2. **quickstart.md**: Rewrite for two-phase setup (deploy agents, then run demos)
+3. **contracts/**: Add agent instruction templates as deployment "contracts"
+
+---
+
+**Status**: Plan updated to reflect new MVP requirements. Next steps:
+1. Update `research.md` with magentic orchestration and azure-ai-projects patterns
+2. Rewrite `quickstart.md` for two-phase approach
+3. Create agent instruction template files
+4. Run `update-agent-context.sh` to update copilot context
