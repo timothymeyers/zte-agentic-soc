@@ -446,44 +446,50 @@ NO custom business logic modules (risk scoring, query generation, etc.) - the LL
 
 No constitutional violations requiring justification. All complexity is inherent to the problem domain (multi-agent coordination, security operations, real-time event processing) and aligned with constitutional principles.
 
-## Phase 0: Research & Technology Decisions (Completed - Update Required)
+## Phase 0: Research & Technology Decisions (✅ Complete - Updated)
 
-The existing `research.md` needs updates to reflect the new approach. Key areas requiring updates:
+The `research.md` has been updated with all identified research areas. All technology decisions are finalized and documented:
 
-1. **Azure AI Projects SDK (azure-ai-projects 2.0.0b2+)**:
-   - ✅ Already covered: Basic agent creation patterns
-   - ⚠️ **UPDATE NEEDED**: V2 agent deployment with `AIProjectClient.agents.create_version()`
-   - ⚠️ **UPDATE NEEDED**: Agent discovery and listing patterns
-   - ⚠️ **UPDATE NEEDED**: Separation of deployment from orchestration
-   - Source: Context7 `/websites/azuresdkdocs_z19_web_core_windows_net_python_azure-ai-projects_2_0_0b2`
+1. **Azure AI Projects SDK (azure-ai-projects 2.0.0b2+)**: ✅ Complete
+   - ✅ V2 agent deployment with `AIProjectClient.agents.create_version()`
+   - ✅ Agent discovery and listing patterns (`get_agent()`, `list_agents()`, `list_versions()`)
+   - ✅ Separation of deployment from orchestration (Phase A vs Phase B)
+   - ✅ Integration with OpenAI client for conversations
+   - Documentation: Section 9 in research.md
 
-2. **Microsoft Agent Framework - Magentic Orchestration**:
-   - ⚠️ **NEW SECTION NEEDED**: Magentic orchestration patterns
-   - Key concepts: Dynamic agent selection, manager agent, progress tracking
-   - Configuration: `MagenticBuilder`, `with_standard_manager()`, participant agents
-   - Human-in-the-loop: Plan review, tool approval, stall intervention
-   - Event streaming: `AgentRunUpdateEvent` for real-time updates
-   - Source: Context7 `/microsoft/agent-framework` and Microsoft Learn docs
+2. **Microsoft Agent Framework - Magentic Orchestration**: ✅ Complete
+   - ✅ Magentic orchestration patterns and core concepts
+   - ✅ Configuration: `MagenticBuilder`, `with_standard_manager()`, participant agents
+   - ✅ Human-in-the-loop: Plan review, tool approval, stall intervention
+   - ✅ Event streaming: `AgentRunUpdateEvent` with `magentic_event_type`
+   - ✅ Manager agent instructions for enforcing triage-first behavior
+   - Documentation: Section 10 in research.md
 
-3. **Agent Instructions (System Prompts)**:
-   - ⚠️ **NEW SECTION NEEDED**: Best practices for writing agent instructions
-   - Focus area for MVP: Quality instructions > tools/integrations
-   - Alert Triage: Risk scoring, prioritization, correlation logic
-   - Threat Hunting: Query generation guidance, anomaly detection patterns
-   - Incident Response: Containment recommendations, playbook adherence
-   - Threat Intelligence: Briefing structure, IOC enrichment patterns
-   - Manager Agent: Task decomposition, agent selection criteria
+3. **Agent Instructions (System Prompts)**: ✅ Complete
+   - ✅ Best practices for writing agent instructions
+   - ✅ Instruction template structure with examples
+   - ✅ Alert Triage: Comprehensive example with risk scoring, correlation logic
+   - ✅ Guidelines for other agents: Hunting, Response, Intelligence, Manager
+   - ✅ Safety guardrails and "give an out" patterns
+   - ✅ Structured output formats (JSON schemas in instructions)
+   - Documentation: Section 11 in research.md
 
-4. **Mock Data Strategy**:
-   - ✅ Already covered: GUIDE and Attack datasets
-   - ⚠️ **UPDATE NEEDED**: Streaming simulation for real-time demos
-   - ⚠️ **UPDATE NEEDED**: Scenario-based test data for each workflow
+4. **Mock Data Strategy**: ✅ Complete
+   - ✅ GUIDE and Attack datasets (already covered in Section 5)
+   - ✅ Async generator-based streaming simulation with configurable intervals
+   - ✅ Checkpoint-based replay for reproducible demos
+   - ✅ Scenario-based test data (curated scenarios: brute force, phishing, ransomware)
+   - ✅ Stream controller interface (pause, resume, reset, jump to index)
+   - Documentation: Section 12 in research.md
 
-5. **Orchestration Plugin Points**:
-   - ⚠️ **NEW SECTION NEEDED**: How to swap orchestration strategies
-   - Current: Magentic orchestrator (dynamic, manager-driven)
-   - Alternatives: Sequential, concurrent, custom orchestrators
-   - Migration path: Agent Framework → Azure Durable Functions/Logic Apps
+5. **Orchestration Plugin Points**: ✅ Complete
+   - ✅ Clear plugin point location (`src/orchestration/orchestrator.py`)
+   - ✅ Current: Magentic orchestrator implementation
+   - ✅ Alternatives: Sequential, concurrent, custom orchestrators
+   - ✅ Migration path: Agent Framework → Azure Durable Functions/Logic Apps
+   - ✅ Configuration-based strategy selection
+   - ✅ Comparison matrix for orchestration strategies
+   - Documentation: Section 13 in research.md
 
 ## Phase 1: Design Artifacts (Completed - Update Required)
 

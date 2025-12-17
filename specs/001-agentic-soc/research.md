@@ -811,17 +811,1409 @@ async def create_triage_agent_with_knowledge():
 
 ---
 
+## 9. Azure AI Projects SDK - V2 Agent Deployment Patterns
+
+### Decision: Use Azure AI Projects SDK 2.0.0b2+ for V2 Agent Deployment
+
+**Rationale**: The Azure AI Projects SDK provides cloud-hosted, persistent agent instances that can be deployed once and reused across multiple orchestration scenarios. This enables clean separation between infrastructure deployment (Phase A) and runtime orchestration (Phase B).
+
+**Implementation Approach**:
+
+1. **V2 Agent Creation with `create_version()`**:
+
+```python
+from azure.ai.projects import AIProjectClient, PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
+import os
+
+# Connect to Azure AI Foundry workspace
+project_client = AIProjectClient.from_connection_string(
+    connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+    credential=DefaultAzureCredential()
+)
+
+# Create a cloud-hosted v2 agent with versioning
+agent = project_client.agents.create_version(
+    agent_name="AlertTriageAgent",
+    definition=PromptAgentDefinition(
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+        instructions="""
+You are an expert SOC analyst specializing in alert triage and risk assessment.
+
+Your role is to analyze security alerts and provide:
+1. Risk assessment (Critical/High/Medium/Low)
+2. Clear reasoning for the assessment
+3. Identification of related alerts for correlation
+4. Recommended next steps for the SOC team
+
+Input format: You will receive security alerts in JSON format.
+Output format: Provide structured JSON with riskLevel, explanation, relatedAlerts, and nextSteps.
+        """,
+    ),
+    description="Alert triage and risk assessment agent v1.0",
+    metadata={
+        "version": "1.0",
+        "agent_type": "triage",
+        "priority": "P1"
+    }
+)
+
+print(f"Agent created: {agent.name} (version: {agent.version}, id: {agent.id})")
+```
+
+2. **Agent Discovery and Listing Patterns**:
+
+```python
+# List all agents in the workspace
+agents = project_client.agents.list_agents()
+for agent in agents:
+    print(f"Agent: {agent.name} - {agent.description}")
+
+# Get a specific agent by name
+triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
+print(f"Retrieved agent: {triage_agent.name} (id: {triage_agent.id})")
+
+# List versions of a specific agent
+versions = project_client.agents.list_versions(agent_name="AlertTriageAgent")
+for version in versions:
+    print(f"Version: {version.version} - Created: {version.created_at}")
+
+# Get a specific version
+specific_version = project_client.agents.get_version(
+    agent_name="AlertTriageAgent",
+    agent_version="1.0"
+)
+```
+
+3. **Separation of Deployment from Orchestration**:
+
+**Phase A: Infrastructure Deployment (One-time)**
+```python
+# deploy_agents.py - Run once to create persistent agents
+from azure.ai.projects import AIProjectClient, PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
+
+async def deploy_all_agents():
+    """Deploy all SOC agents to Azure AI Foundry"""
+    
+    project_client = AIProjectClient.from_connection_string(
+        connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+        credential=DefaultAzureCredential()
+    )
+    
+    # Agent definitions from instruction files
+    agent_definitions = {
+        "AlertTriageAgent": load_instructions("alert_triage_instructions.md"),
+        "ThreatHuntingAgent": load_instructions("threat_hunting_instructions.md"),
+        "IncidentResponseAgent": load_instructions("incident_response_instructions.md"),
+        "ThreatIntelligenceAgent": load_instructions("threat_intelligence_instructions.md"),
+        "SOC_Coordinator": load_instructions("manager_instructions.md")
+    }
+    
+    deployed_agents = {}
+    for agent_name, instructions in agent_definitions.items():
+        agent = project_client.agents.create_version(
+            agent_name=agent_name,
+            definition=PromptAgentDefinition(
+                model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+                instructions=instructions
+            ),
+            description=f"{agent_name} for Agentic SOC MVP"
+        )
+        deployed_agents[agent_name] = agent
+        print(f"✓ Deployed: {agent_name} (version: {agent.version})")
+    
+    return deployed_agents
+
+# Run deployment
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(deploy_all_agents())
+```
+
+**Phase B: Runtime Orchestration (Demonstration)**
+```python
+# orchestrator.py - Use deployed agents in workflows
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+
+async def discover_agents():
+    """Discover pre-deployed agents for orchestration"""
+    
+    project_client = AIProjectClient.from_connection_string(
+        connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+        credential=DefaultAzureCredential()
+    )
+    
+    # Discover deployed agents by name
+    agents = {
+        "triage": project_client.agents.get_agent(agent_name="AlertTriageAgent"),
+        "hunting": project_client.agents.get_agent(agent_name="ThreatHuntingAgent"),
+        "response": project_client.agents.get_agent(agent_name="IncidentResponseAgent"),
+        "intel": project_client.agents.get_agent(agent_name="ThreatIntelligenceAgent"),
+        "manager": project_client.agents.get_agent(agent_name="SOC_Coordinator")
+    }
+    
+    print(f"Discovered {len(agents)} agents for orchestration")
+    return agents
+
+# Agents are now ready for magentic orchestration (see next section)
+```
+
+4. **Using Agents with OpenAI Client**:
+
+```python
+# Create conversation and get responses using discovered agents
+with project_client.get_openai_client() as openai_client:
+    # Reference agent by name in extra_body
+    conversation = openai_client.conversations.create(
+        items=[{
+            "type": "message",
+            "role": "user",
+            "content": "Analyze this high-severity brute force alert..."
+        }]
+    )
+    
+    response = openai_client.responses.create(
+        conversation=conversation.id,
+        extra_body={"agent": {"name": "AlertTriageAgent", "type": "agent_reference"}},
+        input=""
+    )
+    
+    print(f"Triage result: {response.output_text}")
+```
+
+**Key Benefits**:
+- **Persistence**: Agents are created once and can be referenced by name across multiple sessions
+- **Versioning**: Full version control for agent definitions
+- **Reusability**: Same agents can be used in different orchestration patterns
+- **Separation**: Infrastructure deployment is decoupled from demonstration logic
+- **Discovery**: Agents can be discovered and listed at runtime
+- **Metadata**: Rich metadata support for agent categorization and tracking
+
+**Alternatives Considered**:
+- **Ephemeral local agents**: No persistence, requires recreation. Rejected.
+- **Custom agent storage**: More complex, no native SDK support. Rejected.
+
+**References**:
+- [Azure AI Projects SDK - Agent Creation](https://azuresdkdocs.z19.web.core.windows.net/python/azure-ai-projects/2.0.0b2/)
+- [Agent Version Management API](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/)
+
+---
+
+## 10. Microsoft Agent Framework - Magentic Orchestration
+
+### Decision: Use Magentic Orchestration for MVP Demonstration
+
+**Rationale**: Magentic orchestration (based on AutoGen's Magentic-One system) is specifically designed for complex, open-ended security operations tasks where the solution path is not known in advance. A dedicated manager agent dynamically selects which specialized agent should act next based on evolving context, making it ideal for SOC workflows.
+
+**Core Concepts**:
+
+1. **Dynamic Agent Selection**: Manager agent decides which agent to invoke based on current context and progress
+2. **Iterative Refinement**: System can break down complex problems and iterate through multiple rounds
+3. **Progress Tracking**: Built-in mechanisms to detect stalls and reset plans if needed
+4. **Human Oversight**: Optional human-in-the-loop for plan review, tool approval, and stall intervention
+5. **Flexible Collaboration**: Agents can be called multiple times in any order
+
+**Implementation Pattern**:
+
+1. **Building a Magentic Workflow**:
+
+```python
+from agent_framework import MagenticBuilder
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+
+async def create_soc_workflow():
+    """Create magentic workflow with discovered SOC agents"""
+    
+    # Connect to Foundry and discover agents
+    project_client = AIProjectClient.from_connection_string(
+        connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+        credential=DefaultAzureCredential()
+    )
+    
+    # Get deployed agents
+    triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
+    hunting_agent = project_client.agents.get_agent(agent_name="ThreatHuntingAgent")
+    response_agent = project_client.agents.get_agent(agent_name="IncidentResponseAgent")
+    intel_agent = project_client.agents.get_agent(agent_name="ThreatIntelligenceAgent")
+    manager_agent = project_client.agents.get_agent(agent_name="SOC_Coordinator")
+    
+    # Get chat client for manager
+    chat_client = project_client.inference.get_chat_completions_client()
+    
+    # Build magentic workflow
+    workflow = (
+        MagenticBuilder()
+        .participants(
+            triage=triage_agent,
+            hunting=hunting_agent,
+            response=response_agent,
+            intel=intel_agent
+        )
+        .with_standard_manager(
+            chat_client=chat_client,
+            max_round_count=10,      # Maximum collaboration rounds
+            max_stall_count=3,       # Rounds without progress before intervention
+            max_reset_count=2        # Maximum plan resets allowed
+        )
+        .build()
+    )
+    
+    return workflow
+```
+
+2. **Running Workflow with Event Streaming**:
+
+```python
+from agent_framework import AgentRunUpdateEvent
+
+async def run_alert_triage_workflow(alert_data):
+    """Execute SOC workflow with streaming events"""
+    
+    workflow = await create_soc_workflow()
+    
+    # Construct task for manager
+    task = f"""
+    Analyze this security alert and coordinate appropriate response:
+    
+    Alert: {alert_data['AlertName']}
+    Severity: {alert_data['Severity']}
+    Description: {alert_data['Description']}
+    Entities: {alert_data['Entities']}
+    """
+    
+    # Stream workflow execution
+    async for event in workflow.run(task):
+        if isinstance(event, AgentRunUpdateEvent):
+            # Handle different event types
+            if event.magentic_event_type == "plan_created":
+                print(f"📋 Manager Plan: {event.data}")
+            elif event.magentic_event_type == "agent_selected":
+                print(f"🎯 Selected Agent: {event.executor_id}")
+            elif event.magentic_event_type == "agent_response":
+                print(f"💬 {event.executor_id}: {event.data}")
+            elif event.magentic_event_type == "progress_update":
+                print(f"⏳ Progress: {event.data}")
+            elif event.magentic_event_type == "workflow_complete":
+                print(f"✅ Workflow Complete: {event.data}")
+    
+    # Get final result
+    final_state = workflow.get_final_state()
+    outputs = workflow.get_outputs()
+    
+    return {
+        "state": final_state,
+        "outputs": outputs
+    }
+```
+
+3. **Human-in-the-Loop: Plan Review**:
+
+```python
+async def run_with_plan_review():
+    """Enable human review of manager's plan before execution"""
+    
+    workflow = (
+        MagenticBuilder()
+        .participants(
+            triage=triage_agent,
+            hunting=hunting_agent,
+            response=response_agent
+        )
+        .with_standard_manager(
+            chat_client=chat_client,
+            max_round_count=10,
+            max_stall_count=3
+        )
+        .with_plan_review()  # Enable plan review
+        .build()
+    )
+    
+    async for event in workflow.run(task):
+        if event.magentic_event_type == "plan_review_request":
+            # Present plan to human reviewer
+            plan = event.data['plan']
+            print(f"📋 Proposed Plan:\n{plan}")
+            
+            # Get human approval
+            decision = input("Approve plan? (approve/revise/continue): ")
+            
+            if decision == "approve":
+                event.respond(action="APPROVE")
+            elif decision == "revise":
+                feedback = input("Revision feedback: ")
+                event.respond(action="REVISE", feedback=feedback)
+            else:
+                event.respond(action="CONTINUE")
+```
+
+4. **Human-in-the-Loop: Tool Approval**:
+
+```python
+from agent_framework import FunctionApprovalRequestContent
+
+async def run_with_tool_approval():
+    """Enable human approval for agent tool calls"""
+    
+    workflow = create_soc_workflow()
+    
+    async for event in workflow.run(task):
+        if isinstance(event.data, FunctionApprovalRequestContent):
+            # Agent is requesting permission to call a tool
+            tool_name = event.data.function_name
+            tool_args = event.data.arguments
+            
+            print(f"🔧 Agent wants to call: {tool_name}")
+            print(f"   Arguments: {tool_args}")
+            
+            approval = input("Approve? (yes/no): ")
+            
+            if approval.lower() == "yes":
+                event.respond(action="APPROVE")
+            else:
+                event.respond(action="DENY", reason="High-risk action requires manual review")
+```
+
+5. **Human-in-the-Loop: Stall Intervention**:
+
+```python
+async def run_with_stall_intervention():
+    """Enable human intervention when workflow stalls"""
+    
+    workflow = (
+        MagenticBuilder()
+        .participants(triage=triage_agent, hunting=hunting_agent)
+        .with_standard_manager(
+            chat_client=chat_client,
+            max_round_count=10,
+            max_stall_count=1  # Detect stall after 1 round without progress
+        )
+        .with_human_input_on_stall()  # Request human input when stalled
+        .build()
+    )
+    
+    async for event in workflow.run(task):
+        if event.magentic_event_type == "stall_intervention_request":
+            print("⚠️  Workflow has stalled. Agents are not making progress.")
+            print(f"   Current state: {event.data['current_state']}")
+            
+            # Options: CONTINUE (try again), REPLAN (create new plan), GUIDANCE (provide hint)
+            action = input("Action (continue/replan/guidance): ")
+            
+            if action == "guidance":
+                hint = input("Provide guidance for agents: ")
+                event.respond(action="GUIDANCE", guidance=hint)
+            elif action == "replan":
+                event.respond(action="REPLAN")
+            else:
+                event.respond(action="CONTINUE")
+```
+
+**Manager Agent Instructions Pattern** (Enforcing Triage-First):
+
+```markdown
+# SOC Coordinator Agent Instructions
+
+You are the SOC Coordinator managing a team of security analysts (agents).
+
+## Your Team
+- **triage**: Alert Triage Agent - Risk assessment and prioritization
+- **hunting**: Threat Hunting Agent - Proactive threat detection and KQL queries
+- **response**: Incident Response Agent - Containment and remediation recommendations
+- **intel**: Threat Intelligence Agent - Threat context and briefings
+
+## Coordination Rules
+1. **ALWAYS START WITH TRIAGE**: Every security task must begin with the triage agent to assess risk
+2. After triage, select agents based on the risk level and findings:
+   - High/Critical risk: Invoke response agent for containment recommendations
+   - Suspicious patterns: Invoke hunting agent to search for related activity
+   - Unknown threats: Invoke intel agent for threat context
+3. Agents can be called multiple times if needed
+4. Track progress and detect when agents are not making progress
+5. Create clear, actionable plans with specific agent assignments
+
+## Plan Format
+For each task, create a plan with:
+- Step 1: triage - Assess alert risk and identify key indicators
+- Step 2: [agent] - Based on triage results, investigate further
+- Step 3: [agent] - Complete response actions
+```
+
+**Key Configuration Parameters**:
+
+| Parameter | Description | Typical Value |
+|-----------|-------------|---------------|
+| `max_round_count` | Maximum collaboration rounds before stopping | 10-20 |
+| `max_stall_count` | Rounds without progress before intervention | 2-3 |
+| `max_reset_count` | Maximum plan resets allowed | 1-2 |
+
+**Alternatives Considered**:
+- **Sequential orchestration**: Too rigid for security operations. Rejected.
+- **Concurrent orchestration**: No coordination between agents. Rejected.
+- **Custom orchestrator**: Reinventing planning logic. Rejected - leverage proven patterns.
+
+**References**:
+- [Magentic Orchestration Documentation](https://learn.microsoft.com/en-us/agent-framework/user-guide/workflows/orchestrations/magentic)
+- [MagenticBuilder API Reference](https://learn.microsoft.com/en-us/python/api/agent-framework-core/agent_framework.magenticbuilder)
+- [AutoGen Magentic-One System](https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/magentic-one.html)
+
+---
+
+## 11. Agent Instructions - Best Practices for System Prompts
+
+### Decision: Instruction-First Approach with Comprehensive System Prompts
+
+**Rationale**: The MVP focuses on high-quality agent instructions as the primary mechanism for agent behavior. The LLM performs all reasoning, decision-making, and analysis based on instructions - NO custom Python business logic (risk scoring, query generation, etc.). This leverages the model's capabilities while keeping the codebase minimal.
+
+**Core Principles**:
+
+1. **Clarity and Specificity**: Instructions must be clear, specific, and unambiguous
+2. **Role Definition**: Explicitly define the agent's role and expertise
+3. **Input/Output Contracts**: Clearly specify expected input format and output structure
+4. **Examples and Few-Shot Learning**: Provide concrete examples to guide behavior
+5. **Safety and Boundaries**: Define what the agent should NOT do
+6. **Give an "Out"**: Provide alternative paths when the agent cannot complete a task
+
+**Instruction Template Structure**:
+
+```markdown
+# [Agent Name] Instructions
+
+## Role and Expertise
+[Define who the agent is and their specialized domain]
+
+## Your Responsibilities
+[List specific tasks and responsibilities]
+
+## Input Format
+[Describe the structure and format of inputs you will receive]
+
+## Processing Guidelines
+[Step-by-step guidelines for how to approach tasks]
+
+## Output Format
+[Specify the exact structure and format of responses]
+
+## Constraints and Safety
+[Define boundaries - what NOT to do]
+
+## Examples
+[Provide 2-3 concrete examples of input/output pairs]
+```
+
+**Example: Alert Triage Agent Instructions**:
+
+```markdown
+# Alert Triage Agent Instructions
+
+## Role and Expertise
+You are an expert SOC analyst specializing in alert triage, risk assessment, and incident prioritization. You have deep knowledge of security threats, attack patterns, and MITRE ATT&CK framework.
+
+## Your Responsibilities
+1. Analyze security alerts to determine risk level
+2. Identify critical indicators of compromise (IOCs)
+3. Correlate alerts to detect multi-stage attacks
+4. Recommend immediate next steps for SOC analysts
+5. Provide clear, concise explanations for all assessments
+
+## Input Format
+You will receive security alerts in JSON format:
+```json
+{
+  "SystemAlertId": "uuid",
+  "AlertName": "string",
+  "Severity": "High|Medium|Low|Informational",
+  "Description": "string",
+  "TimeGenerated": "ISO 8601 timestamp",
+  "Entities": [
+    {"Type": "ip|user|host|file|url", "Properties": {...}}
+  ],
+  "ExtendedProperties": {
+    "MitreTechniques": ["T1078", "T1083"],
+    "SourceSystem": "Defender|Sentinel|..."
+  }
+}
+```
+
+## Processing Guidelines
+
+### Step 1: Initial Assessment
+- Examine alert severity, source, and description
+- Identify involved entities (users, IPs, hosts, files)
+- Check for MITRE ATT&CK technique mappings
+
+### Step 2: Risk Scoring Factors
+Assess risk level (Critical/High/Medium/Low) based on:
+
+**Severity Indicators** (increases risk):
+- Data exfiltration attempts
+- Lateral movement activity
+- Privilege escalation
+- Credential theft
+- Ransomware indicators
+- Command and control (C2) communication
+
+**Asset Criticality** (increases risk):
+- Production systems
+- Domain controllers
+- Sensitive data repositories
+- Executive accounts
+- Internet-facing services
+
+**User Context** (increases risk):
+- Privileged accounts (admin, domain admin)
+- Service accounts with broad access
+- External/unusual login locations
+- After-hours activity
+
+**Historical Patterns** (adjusts risk):
+- Known false positive patterns (decreases)
+- Repeat offender hosts/users (increases)
+- Similar past incidents (reference outcome)
+
+### Step 3: Correlation Analysis
+Identify related alerts that may indicate:
+- Multi-stage attack progression
+- Lateral movement across hosts
+- Coordinated activity from same source
+- Attack chain completion (reconnaissance → access → exfiltration)
+
+### Step 4: Recommendation Generation
+Provide actionable next steps:
+- Immediate actions (e.g., "Isolate host", "Disable account")
+- Investigation tasks (e.g., "Check for lateral movement", "Review login history")
+- Escalation criteria (e.g., "Escalate if exfiltration confirmed")
+
+## Output Format
+Respond with structured JSON:
+```json
+{
+  "riskLevel": "Critical|High|Medium|Low",
+  "riskScore": 0-100,
+  "explanation": "Clear 2-3 sentence explanation of risk assessment",
+  "keyIndicators": [
+    "Most important IOCs or patterns identified"
+  ],
+  "relatedAlerts": [
+    {"alertId": "uuid", "relationship": "description"}
+  ],
+  "mitreTechniques": ["T1078", "T1083"],
+  "attackStage": "Initial Access|Execution|Persistence|...",
+  "nextSteps": [
+    {"action": "description", "priority": "immediate|high|normal"}
+  ],
+  "confidence": "high|medium|low"
+}
+```
+
+## Constraints and Safety
+**DO NOT**:
+- Make assumptions beyond available data
+- Ignore low-severity alerts without assessment
+- Recommend destructive actions without justification
+- Provide risk scores without clear reasoning
+
+**ALWAYS**:
+- Explain your reasoning clearly
+- Cite specific indicators from the alert
+- Consider both technical and business impact
+- If information is insufficient, state: "Unable to fully assess - require additional context: [specify what's needed]"
+
+## Examples
+
+### Example 1: High-Risk Brute Force Attack
+**Input**:
+```json
+{
+  "AlertName": "Multiple failed logins followed by success",
+  "Severity": "Medium",
+  "Description": "User account showed 25 failed login attempts from 5 different IPs, followed by successful login",
+  "Entities": [
+    {"Type": "user", "Properties": {"Name": "admin@contoso.com", "IsPrivileged": true}},
+    {"Type": "ip", "Properties": {"Address": "203.0.113.42", "GeoLocation": "Russia"}}
+  ],
+  "ExtendedProperties": {
+    "MitreTechniques": ["T1078"],
+    "FailedAttempts": 25,
+    "SuccessfulLogin": true
+  }
+}
+```
+
+**Output**:
+```json
+{
+  "riskLevel": "High",
+  "riskScore": 85,
+  "explanation": "Successful brute force attack against privileged account (admin) from suspicious foreign IP after 25 failed attempts. High risk of account compromise.",
+  "keyIndicators": [
+    "25 failed login attempts",
+    "Privileged admin account targeted",
+    "Foreign IP (Russia) - unusual for organization",
+    "Successful authentication after failed attempts"
+  ],
+  "relatedAlerts": [],
+  "mitreTechniques": ["T1078"],
+  "attackStage": "Initial Access",
+  "nextSteps": [
+    {"action": "Immediately disable account admin@contoso.com pending investigation", "priority": "immediate"},
+    {"action": "Check for subsequent activity from this account (lateral movement, data access)", "priority": "immediate"},
+    {"action": "Review all logins from IP 203.0.113.42 in last 7 days", "priority": "high"},
+    {"action": "Implement MFA if not already enabled", "priority": "normal"}
+  ],
+  "confidence": "high"
+}
+```
+
+### Example 2: Low-Risk False Positive
+**Input**:
+```json
+{
+  "AlertName": "Suspicious PowerShell execution",
+  "Severity": "Low",
+  "Description": "PowerShell script executed with encoded command",
+  "Entities": [
+    {"Type": "host", "Properties": {"Name": "WORKSTATION-42"}},
+    {"Type": "file", "Properties": {"Name": "update-inventory.ps1"}}
+  ],
+  "ExtendedProperties": {
+    "MitreTechniques": ["T1059.001"],
+    "CommandLine": "powershell.exe -EncodedCommand [base64]"
+  }
+}
+```
+
+**Output**:
+```json
+{
+  "riskLevel": "Low",
+  "riskScore": 25,
+  "explanation": "PowerShell execution detected, but appears to be legitimate inventory update script based on filename and historical pattern. Low risk, likely administrative task.",
+  "keyIndicators": [
+    "Encoded command usage (common in malware)",
+    "Script name suggests inventory management",
+    "No unusual network activity",
+    "Workstation is IT management system"
+  ],
+  "relatedAlerts": [],
+  "mitreTechniques": ["T1059.001"],
+  "attackStage": "Execution",
+  "nextSteps": [
+    {"action": "Verify script source and purpose with IT team", "priority": "normal"},
+    {"action": "Add to allowlist if confirmed legitimate", "priority": "normal"}
+  ],
+  "confidence": "medium"
+}
+```
+
+### Example 3: Insufficient Information
+**Input**:
+```json
+{
+  "AlertName": "Anomalous user behavior",
+  "Severity": "Medium",
+  "Description": "User behavior deviated from baseline",
+  "Entities": [
+    {"Type": "user", "Properties": {"Name": "jsmith@contoso.com"}}
+  ]
+}
+```
+
+**Output**:
+```json
+{
+  "riskLevel": "Medium",
+  "riskScore": 50,
+  "explanation": "Unable to fully assess - alert lacks specific indicators of compromise. Require additional context to determine if behavior is malicious or benign.",
+  "keyIndicators": [
+    "Baseline deviation detected (specifics not provided)"
+  ],
+  "relatedAlerts": [],
+  "mitreTechniques": [],
+  "attackStage": "Unknown",
+  "nextSteps": [
+    {"action": "Request detailed baseline deviation metrics (What specific behaviors changed?)", "priority": "immediate"},
+    {"action": "Review recent user activity logs for jsmith@contoso.com", "priority": "high"},
+    {"action": "Check for recent role changes or access grants", "priority": "normal"}
+  ],
+  "confidence": "low"
+}
+```
+```
+
+**Additional Agent Instruction Guidelines**:
+
+1. **Alert Triage Instructions**: Focus on risk assessment logic, correlation patterns, and prioritization criteria
+2. **Threat Hunting Instructions**: Emphasize KQL query formulation, anomaly detection reasoning, and hypothesis generation
+3. **Incident Response Instructions**: Detail containment strategy selection, playbook adherence, and impact assessment
+4. **Threat Intelligence Instructions**: Specify briefing structure, IOC enrichment logic, and MITRE mapping
+5. **Manager/Coordinator Instructions**: Define task decomposition, agent selection criteria, and progress tracking
+
+**Best Practices Summary**:
+
+| Practice | Description | Example |
+|----------|-------------|---------|
+| **Be Specific** | Avoid vague language | "Assess risk based on: asset criticality, user privileges, attack stage" vs. "Look at the alert" |
+| **Use Examples** | Provide 2-3 concrete cases | Include input/output pairs with varied scenarios |
+| **Keep it Concise** | Long instructions cause latency | Aim for < 2000 characters for custom sections |
+| **Give an Out** | Provide alternative paths | "If data is insufficient, respond with 'Unable to assess - require: [X]'" |
+| **Safety Guardrails** | Define boundaries | "DO NOT recommend account deletion without explicit approval" |
+| **Structured Output** | Enforce JSON schemas | Provide exact format with all required fields |
+
+**References**:
+- [Microsoft Agent Instructions Best Practices](https://learn.microsoft.com/en-us/microsoft-copilot-studio/nlu-prompt-node#best-practices-for-prompt-instructions)
+- [Prompt Engineering for Security Agents](https://learn.microsoft.com/en-us/security/benchmark/azure/mcsb-v2-artificial-intelligence-security#ai-3-adopt-safety-meta-prompts)
+- [Declarative Agent Instructions Guide](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/declarative-agent-instructions)
+
+---
+
+## 12. Mock Data Strategy - Streaming Simulation
+
+### Decision: Configurable Streaming with Checkpoint-Based Replay
+
+**Rationale**: To demonstrate real-time SOC operations, mock data must be streamed at realistic intervals (not dumped all at once). Checkpoint-based replay enables reproducible demos, allowing operators to pause, resume, and replay scenarios from specific points.
+
+**Implementation Strategy**:
+
+1. **Async Generator-Based Streaming**:
+
+```python
+import asyncio
+import json
+from pathlib import Path
+from typing import AsyncGenerator, Dict, Any
+from datetime import datetime
+
+class MockDataStreamer:
+    """Streams mock security alerts with configurable intervals"""
+    
+    def __init__(
+        self,
+        dataset_path: str,
+        interval_seconds: float = 15.0,
+        checkpoint_file: str = "/tmp/mock_stream_checkpoint.json"
+    ):
+        self.dataset_path = Path(dataset_path)
+        self.interval = interval_seconds
+        self.checkpoint_file = Path(checkpoint_file)
+        self.alerts = self._load_dataset()
+    
+    def _load_dataset(self) -> list[Dict[str, Any]]:
+        """Load GUIDE/Attack dataset from JSON/CSV"""
+        with open(self.dataset_path, 'r') as f:
+            if self.dataset_path.suffix == '.json':
+                data = json.load(f)
+            else:
+                import pandas as pd
+                data = pd.read_csv(self.dataset_path).to_dict('records')
+        return data
+    
+    def _load_checkpoint(self) -> int:
+        """Load checkpoint index for replay"""
+        if not self.checkpoint_file.exists():
+            return 0
+        with open(self.checkpoint_file, 'r') as f:
+            checkpoint = json.load(f)
+        return checkpoint.get('last_index', 0)
+    
+    def _save_checkpoint(self, index: int):
+        """Save checkpoint for replay capability"""
+        checkpoint = {
+            'last_index': index,
+            'timestamp': datetime.utcnow().isoformat(),
+            'dataset': str(self.dataset_path)
+        }
+        self.checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.checkpoint_file, 'w') as f:
+            json.dump(checkpoint, f)
+    
+    async def stream_alerts(
+        self,
+        batch_size: int = 5,
+        start_index: int = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Stream alerts at configured interval with batching
+        
+        Args:
+            batch_size: Number of alerts per batch (default: 5)
+            start_index: Override checkpoint start index
+        
+        Yields:
+            Alert data dictionaries
+        """
+        # Resume from checkpoint or specified index
+        current_index = start_index if start_index is not None else self._load_checkpoint()
+        
+        print(f"📡 Starting stream from index {current_index} (interval: {self.interval}s)")
+        
+        while current_index < len(self.alerts):
+            # Get next batch
+            batch_end = min(current_index + batch_size, len(self.alerts))
+            batch = self.alerts[current_index:batch_end]
+            
+            # Stream each alert in batch
+            for alert in batch:
+                # Transform to Sentinel format
+                sentinel_alert = self._transform_to_sentinel(alert)
+                yield sentinel_alert
+            
+            # Update checkpoint
+            current_index = batch_end
+            self._save_checkpoint(current_index)
+            
+            # Wait before next batch
+            if current_index < len(self.alerts):
+                print(f"⏸️  Streamed {current_index}/{len(self.alerts)} alerts, waiting {self.interval}s...")
+                await asyncio.sleep(self.interval)
+        
+        print(f"✅ Stream complete: {len(self.alerts)} alerts processed")
+    
+    def _transform_to_sentinel(self, guide_record: Dict) -> Dict[str, Any]:
+        """Transform GUIDE/Attack data to Sentinel SecurityAlert schema"""
+        return {
+            "SystemAlertId": guide_record.get("AlertId", f"alert-{hash(str(guide_record))}"),
+            "AlertName": guide_record.get("Category", "Unknown Alert"),
+            "Severity": self._map_severity(guide_record.get("IncidentGrade")),
+            "Description": guide_record.get("AlertTitle", "No description"),
+            "TimeGenerated": guide_record.get("Timestamp", datetime.utcnow().isoformat()),
+            "Entities": self._extract_entities(guide_record),
+            "ExtendedProperties": {
+                "MitreTechniques": guide_record.get("MitreTechniques", []),
+                "EntityCount": guide_record.get("EntityCount", 0),
+                "OrgId": guide_record.get("OrgId", "demo-org"),
+                "SourceDataset": "GUIDE"
+            },
+            "ProviderName": "Microsoft Sentinel (Mock)",
+        }
+    
+    def _map_severity(self, incident_grade: str) -> str:
+        """Map GUIDE IncidentGrade to Sentinel severity"""
+        mapping = {
+            "TruePositive": "High",
+            "BenignPositive": "Low",
+            "FalsePositive": "Informational"
+        }
+        return mapping.get(incident_grade, "Medium")
+    
+    def _extract_entities(self, record: Dict) -> list[Dict]:
+        """Extract entities from GUIDE record"""
+        entities = []
+        
+        # Extract IPs
+        if "IpAddress" in record:
+            entities.append({
+                "Type": "ip",
+                "Properties": {"Address": record["IpAddress"]}
+            })
+        
+        # Extract user accounts
+        if "AccountName" in record:
+            entities.append({
+                "Type": "account",
+                "Properties": {"Name": record["AccountName"]}
+            })
+        
+        # Extract hosts
+        if "DeviceName" in record:
+            entities.append({
+                "Type": "host",
+                "Properties": {"HostName": record["DeviceName"]}
+            })
+        
+        return entities
+    
+    def reset_checkpoint(self):
+        """Reset checkpoint to start from beginning"""
+        if self.checkpoint_file.exists():
+            self.checkpoint_file.unlink()
+        print("✅ Checkpoint reset")
+```
+
+2. **Integration with Event Hubs (Mock)**:
+
+```python
+from azure.eventhub.aio import EventHubProducerClient
+from azure.eventhub import EventData
+
+async def stream_to_event_hub():
+    """Stream mock alerts to Azure Event Hubs"""
+    
+    # Create streamer
+    streamer = MockDataStreamer(
+        dataset_path="mock-data/guide_alerts.json",
+        interval_seconds=15,
+        checkpoint_file="/tmp/soc_demo_checkpoint.json"
+    )
+    
+    # Connect to Event Hub
+    producer = EventHubProducerClient.from_connection_string(
+        conn_str=os.environ["EVENTHUB_CONNECTION_STRING"],
+        eventhub_name="security-alerts"
+    )
+    
+    async with producer:
+        async for alert in streamer.stream_alerts(batch_size=5):
+            # Send to Event Hub
+            event_data = EventData(json.dumps(alert))
+            await producer.send_event(event_data)
+            
+            print(f"📤 Sent alert: {alert['AlertName']} (ID: {alert['SystemAlertId']})")
+
+# Run streaming
+asyncio.run(stream_to_event_hub())
+```
+
+3. **Scenario-Based Test Data**:
+
+```python
+class ScenarioManager:
+    """Manage curated security scenarios for demos"""
+    
+    SCENARIOS = {
+        "brute_force": {
+            "name": "Brute Force Attack",
+            "description": "20 failed logins → successful login → lateral movement",
+            "alerts": [
+                "failed_login_attempt_1.json",
+                "failed_login_attempt_20.json",
+                "successful_login_suspicious_ip.json",
+                "lateral_movement_rdp.json"
+            ],
+            "interval": 10  # seconds between alerts
+        },
+        "phishing_campaign": {
+            "name": "Phishing Campaign",
+            "description": "Suspicious email → credential theft → data exfiltration",
+            "alerts": [
+                "suspicious_email_received.json",
+                "credential_harvesting_detected.json",
+                "large_data_upload.json"
+            ],
+            "interval": 20
+        },
+        "ransomware": {
+            "name": "Ransomware Infection",
+            "description": "Malware execution → file encryption → C2 communication",
+            "alerts": [
+                "malware_execution.json",
+                "file_encryption_activity.json",
+                "c2_communication_detected.json",
+                "ransom_note_created.json"
+            ],
+            "interval": 15
+        }
+    }
+    
+    def __init__(self, scenarios_dir: str = "mock-data/scenarios"):
+        self.scenarios_dir = Path(scenarios_dir)
+    
+    async def run_scenario(self, scenario_name: str) -> AsyncGenerator[Dict, None]:
+        """Run a specific demo scenario"""
+        if scenario_name not in self.SCENARIOS:
+            raise ValueError(f"Unknown scenario: {scenario_name}")
+        
+        scenario = self.SCENARIOS[scenario_name]
+        print(f"🎬 Running scenario: {scenario['name']}")
+        print(f"   Description: {scenario['description']}")
+        
+        for alert_file in scenario['alerts']:
+            # Load alert data
+            alert_path = self.scenarios_dir / scenario_name / alert_file
+            with open(alert_path, 'r') as f:
+                alert = json.load(f)
+            
+            yield alert
+            
+            # Wait between alerts
+            await asyncio.sleep(scenario['interval'])
+        
+        print(f"✅ Scenario complete: {scenario['name']}")
+
+# Usage
+async def demo_brute_force():
+    """Demo brute force attack scenario"""
+    manager = ScenarioManager()
+    
+    async for alert in manager.run_scenario("brute_force"):
+        print(f"📧 New Alert: {alert['AlertName']}")
+        # Process alert through workflow...
+```
+
+4. **Replay and Control Interface**:
+
+```python
+class StreamController:
+    """Control interface for demo streaming"""
+    
+    def __init__(self, streamer: MockDataStreamer):
+        self.streamer = streamer
+        self.paused = False
+        self.current_index = 0
+    
+    async def start(self):
+        """Start streaming"""
+        async for alert in self.streamer.stream_alerts():
+            if not self.paused:
+                yield alert
+            else:
+                # Wait while paused
+                await asyncio.sleep(1)
+    
+    def pause(self):
+        """Pause streaming"""
+        self.paused = True
+        print("⏸️  Stream paused")
+    
+    def resume(self):
+        """Resume streaming"""
+        self.paused = False
+        print("▶️  Stream resumed")
+    
+    def reset(self):
+        """Reset to beginning"""
+        self.streamer.reset_checkpoint()
+        self.current_index = 0
+        print("⏮️  Stream reset")
+    
+    def jump_to(self, index: int):
+        """Jump to specific index"""
+        self.streamer._save_checkpoint(index)
+        self.current_index = index
+        print(f"⏭️  Jumped to index {index}")
+```
+
+**Configuration Options**:
+
+| Parameter | Description | Default | Range |
+|-----------|-------------|---------|-------|
+| `interval_seconds` | Time between alert batches | 15 | 5-300 |
+| `batch_size` | Alerts per batch | 5 | 1-100 |
+| `checkpoint_file` | Path to checkpoint storage | `/tmp/checkpoint.json` | Any writable path |
+
+**Alternatives Considered**:
+- **Static dataset dump**: No demonstration of real-time processing. Rejected.
+- **Fully synthetic generation**: Lower fidelity than GUIDE/Attack datasets. Rejected.
+- **External streaming platform**: Unnecessary complexity for MVP. Deferred to production.
+
+**References**:
+- [Python Streaming Data Generators](https://github.com/satvik-ap/DATA-STREAMING-SIMULATION-USING-GENERATORS)
+- [Azure Event Hubs Python SDK](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-python-get-started-send)
+
+---
+
+## 13. Orchestration Plugin Points - Strategy Flexibility
+
+### Decision: Clear Extension Point for Orchestration Strategy Changes
+
+**Rationale**: While magentic orchestration is ideal for the MVP's dynamic, manager-driven approach, production deployments may require different orchestration strategies (sequential, concurrent, or custom). The architecture must make it obvious where and how to change orchestration without rewriting the entire system.
+
+**Plugin Point Location**:
+
+```
+src/orchestration/orchestrator.py
+└── create_workflow() function  ← PRIMARY PLUGIN POINT
+```
+
+**Current Implementation (Magentic)**:
+
+```python
+# src/orchestration/orchestrator.py
+
+from agent_framework import MagenticBuilder, Workflow
+from azure.ai.projects import AIProjectClient
+from typing import Dict, Any
+
+def create_workflow(
+    agents: Dict[str, Any],
+    orchestration_type: str = "magentic",
+    **config
+) -> Workflow:
+    """
+    Create orchestration workflow for SOC agents
+    
+    ⚙️  PLUGIN POINT: Change orchestration strategy here
+    
+    Args:
+        agents: Dictionary of deployed agents (triage, hunting, response, intel, manager)
+        orchestration_type: Type of orchestration ("magentic", "sequential", "concurrent", "custom")
+        **config: Orchestration-specific configuration
+    
+    Returns:
+        Workflow instance
+    """
+    
+    if orchestration_type == "magentic":
+        return _create_magentic_workflow(agents, **config)
+    elif orchestration_type == "sequential":
+        return _create_sequential_workflow(agents, **config)
+    elif orchestration_type == "concurrent":
+        return _create_concurrent_workflow(agents, **config)
+    elif orchestration_type == "custom":
+        return _create_custom_workflow(agents, **config)
+    else:
+        raise ValueError(f"Unknown orchestration type: {orchestration_type}")
+
+# ------------------------------------------------------------
+# CURRENT MVP IMPLEMENTATION: Magentic Orchestration
+# ------------------------------------------------------------
+
+def _create_magentic_workflow(agents: Dict, **config) -> Workflow:
+    """
+    Magentic orchestration with dynamic agent selection
+    
+    Characteristics:
+    - Manager agent dynamically selects next agent
+    - Iterative refinement through multiple rounds
+    - Human-in-the-loop support (plan review, tool approval, stall intervention)
+    - Best for: Complex, open-ended tasks with unclear solution paths
+    
+    Use Cases:
+    - Security incident investigation (unknown attack patterns)
+    - Threat hunting (hypothesis-driven exploration)
+    - Complex alert correlation
+    """
+    
+    return (
+        MagenticBuilder()
+        .participants(
+            triage=agents['triage'],
+            hunting=agents['hunting'],
+            response=agents['response'],
+            intel=agents['intel']
+        )
+        .with_standard_manager(
+            chat_client=agents['manager'],
+            max_round_count=config.get('max_rounds', 10),
+            max_stall_count=config.get('max_stalls', 3),
+            max_reset_count=config.get('max_resets', 2)
+        )
+        .with_plan_review(enable=config.get('plan_review', False))
+        .with_human_input_on_stall()
+        .build()
+    )
+
+# ------------------------------------------------------------
+# ALTERNATIVE 1: Sequential Orchestration
+# ------------------------------------------------------------
+
+def _create_sequential_workflow(agents: Dict, **config) -> Workflow:
+    """
+    Sequential orchestration with fixed agent order
+    
+    Characteristics:
+    - Predefined sequence: triage → hunting → response → intel
+    - No dynamic routing
+    - Predictable execution path
+    - Best for: Standardized workflows with known steps
+    
+    Use Cases:
+    - Standard alert triage pipeline
+    - Routine threat intelligence gathering
+    - Compliance-driven investigations (must follow specific steps)
+    """
+    from agent_framework import SequentialOrchestration
+    
+    return SequentialOrchestration(
+        agents['triage'],
+        agents['hunting'],
+        agents['response'],
+        agents['intel']
+    )
+
+# ------------------------------------------------------------
+# ALTERNATIVE 2: Concurrent Orchestration
+# ------------------------------------------------------------
+
+def _create_concurrent_workflow(agents: Dict, **config) -> Workflow:
+    """
+    Concurrent orchestration with parallel agent execution
+    
+    Characteristics:
+    - All agents execute simultaneously
+    - No coordination between agents
+    - Fastest execution time
+    - Best for: Independent tasks that don't require coordination
+    
+    Use Cases:
+    - Bulk alert triage (process multiple alerts in parallel)
+    - Parallel threat hunting across multiple data sources
+    - Independent intelligence enrichment tasks
+    """
+    from agent_framework import ConcurrentOrchestration
+    
+    # All agents run in parallel, results aggregated at end
+    return ConcurrentOrchestration([
+        agents['triage'],
+        agents['hunting'],
+        agents['response'],
+        agents['intel']
+    ])
+
+# ------------------------------------------------------------
+# ALTERNATIVE 3: Custom Orchestrator
+# ------------------------------------------------------------
+
+def _create_custom_workflow(agents: Dict, **config) -> Workflow:
+    """
+    Custom orchestration with business-specific logic
+    
+    Characteristics:
+    - Imperative control flow in Python
+    - Full flexibility for complex routing
+    - Can enforce mandatory triage-first behavior
+    - Best for: Organization-specific workflows with strict requirements
+    
+    Use Cases:
+    - Regulated environments requiring specific agent sequences
+    - Complex conditional logic (if high risk, skip hunting and go directly to response)
+    - Integration with external approval systems
+    """
+    from agent_framework import CustomOrchestration
+    
+    class SOCOrchestrator(CustomOrchestration):
+        async def run(self, task: str):
+            # ALWAYS start with triage (guaranteed)
+            triage_result = await agents['triage'].run(task)
+            
+            # Route based on triage risk level
+            risk_level = triage_result.get('riskLevel')
+            
+            if risk_level in ['Critical', 'High']:
+                # High risk: immediate response, skip hunting
+                response_result = await agents['response'].run(triage_result)
+                return response_result
+            elif risk_level == 'Medium':
+                # Medium risk: investigate with hunting, then respond
+                hunting_result = await agents['hunting'].run(triage_result)
+                response_result = await agents['response'].run(hunting_result)
+                return response_result
+            else:
+                # Low risk: enrich with intel only
+                intel_result = await agents['intel'].run(triage_result)
+                return intel_result
+    
+    return SOCOrchestrator()
+
+# ------------------------------------------------------------
+# FUTURE: Azure Durable Functions (Production Scale)
+# ------------------------------------------------------------
+
+def _create_durable_functions_workflow(agents: Dict, **config):
+    """
+    Azure Durable Functions for production-scale orchestration
+    
+    ⚠️  NOT IMPLEMENTED IN MVP
+    
+    Characteristics:
+    - Stateful, serverless orchestration
+    - Automatic retry and error handling
+    - Long-running workflows (days/weeks)
+    - Best for: Production deployments requiring scale and reliability
+    
+    Migration Path:
+    1. Keep agent definitions unchanged (reuse deployed Foundry agents)
+    2. Replace MagenticBuilder with Durable Functions orchestrator client
+    3. Implement orchestration logic as Durable Function
+    4. Deploy to Azure Functions Premium or Container Apps
+    
+    Code structure:
+    ```python
+    import azure.functions as func
+    import azure.durable_functions as df
+    
+    @df.activity_function
+    async def triage_activity(context):
+        # Call deployed triage agent
+        result = await call_foundry_agent("AlertTriageAgent", context)
+        return result
+    
+    @df.orchestrator_function
+    def soc_orchestrator(context):
+        # Orchestration logic
+        triage_result = yield context.call_activity("triage_activity", input_data)
+        
+        if triage_result['riskLevel'] == 'High':
+            response_result = yield context.call_activity("response_activity", triage_result)
+            return response_result
+        # ... more logic
+    ```
+    """
+    raise NotImplementedError("Durable Functions orchestration not implemented in MVP")
+```
+
+**How to Change Orchestration Strategy**:
+
+1. **Configuration-based** (Recommended for MVP):
+```python
+# config.yaml
+orchestration:
+  type: "magentic"  # Change to "sequential", "concurrent", "custom"
+  max_rounds: 10
+  plan_review: false
+
+# Load and apply
+import yaml
+with open('config.yaml') as f:
+    config = yaml.safe_load(f)
+
+workflow = create_workflow(
+    agents=deployed_agents,
+    orchestration_type=config['orchestration']['type'],
+    **config['orchestration']
+)
+```
+
+2. **Environment variable**:
+```bash
+export SOC_ORCHESTRATION_TYPE=sequential
+```
+
+3. **Runtime override**:
+```python
+# For specific scenarios
+workflow = create_workflow(agents, orchestration_type="custom")
+```
+
+**Migration Checklist** (Magentic → Alternative):
+
+- [ ] Identify orchestration requirements (predictable vs. dynamic, fast vs. thorough)
+- [ ] Update `config.yaml` with new orchestration type
+- [ ] Test workflow with sample alerts
+- [ ] Verify agent interactions match expectations
+- [ ] Update documentation (quickstart.md) with new behavior
+- [ ] No changes needed to agent instructions or deployment scripts ✅
+
+**Comparison Matrix**:
+
+| Strategy | Execution Order | Coordination | Speed | Use Case |
+|----------|----------------|--------------|-------|----------|
+| **Magentic** | Dynamic (manager decides) | High (manager plans) | Slower | Complex investigations, unknown paths |
+| **Sequential** | Fixed (predefined) | None (linear) | Medium | Standard workflows, compliance |
+| **Concurrent** | Parallel (all at once) | None (independent) | Fastest | Bulk processing, independent tasks |
+| **Custom** | Imperative (Python code) | Full (programmatic) | Medium | Organization-specific logic |
+| **Durable Functions** | Stateful (orchestrator) | High (built-in retry) | Scalable | Production, long-running, high-volume |
+
+**References**:
+- [Agent Framework Orchestration Patterns](https://learn.microsoft.com/en-us/agent-framework/user-guide/workflows/)
+- [Azure Durable Functions](https://learn.microsoft.com/en-us/azure/azure-functions/durable/)
+
+---
+
 ## Next Steps (Phase 1: Design)
 
-With all technology decisions finalized, Phase 1 will create:
+With all technology decisions finalized (including newly researched areas), Phase 1 will create:
 
 1. **data-model.md**: Entity definitions (Alert, Incident, Finding, IOC, Agent State)
-2. **contracts/**: API contracts and JSON schemas for agent interfaces
-3. **quickstart.md**: Setup instructions and demo walkthrough
+2. **contracts/**: API contracts and JSON schemas for agent interfaces, plus agent instruction templates
+3. **quickstart.md**: Setup instructions and demo walkthrough (rewritten for two-phase approach)
 4. **Agent context updates**: Technology additions to Copilot agent file
 
 ---
 
-**Research Status**: ✅ Complete  
+**Research Status**: ✅ Complete (Updated)  
 **All NEEDS CLARIFICATION items resolved**: ✅ Yes  
+**New research sections added**: ✅ Yes (5 new sections: Azure AI Projects SDK, Magentic Orchestration, Agent Instructions Best Practices, Mock Data Streaming, Orchestration Plugin Points)  
 **Ready for Phase 1 (Design)**: ✅ Yes
