@@ -126,7 +126,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
 **Tools**: `azure-ai-projects` SDK (version 2.0.0b2 or later)
 
 **Process**:
-1. Deploy Azure AI Foundry workspace with required models (GPT-4.1-mini for MVP)
+1. Connect to existing Azure AI Foundry workspace via environment variables (`PROJECT_ENDPOINT`, `MODEL_DEPLOYMENT_NAME`) or deploy new workspace if not available
 2. Use `AIProjectClient.agents.create_version()` to create persistent v2 agents:
    - Alert Triage Agent with instructions for risk scoring and prioritization
    - Threat Hunting Agent with instructions for query generation and anomaly detection
@@ -136,7 +136,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
    - Clear name (e.g., "AlertTriageAgent")
    - Detailed instructions (system prompt defining behavior)
    - Model deployment reference (e.g., "gpt-4.1-mini")
-   - NO tools initially (focus on instruction quality)
+   - NO tools initially (focus on instruction quality) - tools will be added in later phases
 4. Agents persist in Azure AI Foundry and can be discovered by name/ID
 
 **Output**: Cloud-hosted agents that can be referenced by name in demonstration code
@@ -150,10 +150,26 @@ The MVP follows a clear separation between infrastructure deployment and demonst
 **Process**:
 1. Discover deployed agents using `AIProjectClient.agents.get_agent()` or list operations
 2. Wrap agent references in Agent Framework agent wrappers
-3. Use `MagenticBuilder` to create dynamic multi-agent orchestration:
+3. Create a manager agent - this is a ChatAgent you create with instructions for task coordination:
    ```python
-   from agent_framework import MagenticBuilder
+   from agent_framework import ChatAgent, MagenticBuilder
+   from agent_framework.openai import OpenAIChatClient
    
+   # Create manager agent (you must create this - not provided by framework)
+   manager_agent = ChatAgent(
+       name="SOC_Coordinator",
+       chat_client=OpenAIChatClient(model_id="gpt-4.1-mini"),
+       instructions="""You coordinate SOC agents. For each security task:
+       1. ALWAYS start with the Triage agent to assess the alert
+       2. Based on triage results, delegate to appropriate agents:
+          - High/Critical risks → Incident Response agent
+          - Investigation needed → Threat Hunting agent
+          - Context needed → Threat Intelligence agent
+       3. Synthesize findings into actionable recommendations
+       """
+   )
+   
+   # Build magentic workflow with the manager
    workflow = (
        MagenticBuilder()
        .participants(
@@ -163,7 +179,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
            intel=intel_agent
        )
        .with_standard_manager(
-           agent=manager_agent,
+           agent=manager_agent,  # Pass your custom manager agent
            max_round_count=10,
            max_stall_count=3
        )
@@ -171,7 +187,8 @@ The MVP follows a clear separation between infrastructure deployment and demonst
    )
    ```
 4. Stream mock data (GUIDE/Attack datasets) to trigger workflows
-5. Magentic manager dynamically selects which agent to invoke based on task context
+5. Magentic manager dynamically selects which agent to invoke based on task context and manager instructions
+6. **Alternative approach for guaranteed triage-first**: Implement custom manager that always routes to triage agent first, then uses magentic orchestration for subsequent steps
 
 **Output**: Demonstrable SOC scenarios showing multi-agent collaboration
 
@@ -237,6 +254,34 @@ Provide your analysis as JSON:
 - **Handles Uncertainty**: Well-suited for security scenarios where solution path is not predetermined
 - **Human-in-the-Loop**: Built-in support for approval gates and stall intervention
 - **Future-Proof**: Clear extension point - replace magentic with custom orchestrator in production
+- **Triage-First Pattern**: Manager instructions can enforce "always start with triage" behavior, or implement custom manager for guaranteed routing
+
+**Ensuring Triage Agent Goes First**:
+Two approaches are available:
+
+1. **Via Manager Instructions** (Recommended for MVP - simpler):
+   - Manager agent instructions explicitly state "ALWAYS start with the Triage agent"
+   - Relies on LLM to follow instructions consistently
+   - Example: "For each security task: 1. ALWAYS start with the Triage agent..."
+   - Pro: Simpler implementation, leverages LLM reasoning
+   - Con: Depends on LLM compliance with instructions
+
+2. **Custom Manager Implementation** (Production option - guaranteed):
+   - Extend `MagenticManagerBase` with custom routing logic
+   - Hardcode triage agent as first step, then use magentic for remaining agents
+   - Guarantees triage always executes first
+   - Example:
+     ```python
+     class TriageFirstManager(MagenticManagerBase):
+         async def plan(self, context: MagenticContext) -> ChatMessage:
+             # Force triage agent first
+             if not context.has_invoked("triage"):
+                 return ChatMessage(text="Invoke triage agent")
+             # Then use standard magentic logic for remaining agents
+             return await super().plan(context)
+     ```
+   - Pro: Guaranteed execution order
+   - Con: More complex, requires custom manager implementation
 
 **Where to Change Orchestration Strategy** (Explicit Plugin Point):
 - File: `src/orchestration/orchestrator.py`
@@ -284,7 +329,7 @@ src/
 │       ├── threat_hunting_instructions.md   # Instructions for threat hunting, query formulation, anomaly detection
 │       ├── incident_response_instructions.md # Instructions for containment, remediation recommendations
 │       ├── threat_intelligence_instructions.md # Instructions for briefings, IOC enrichment
-│       └── manager_instructions.md          # Magentic manager instructions (task decomposition, agent selection)
+│       └── manager_instructions.md          # Manager agent instructions (enforces triage-first, agent selection)
 ├── orchestration/                   # Phase B: Runtime orchestration (demonstration)
 │   ├── __init__.py
 │   ├── orchestrator.py              # Magentic orchestrator setup (PLUGIN POINT - change here for different orchestration)
