@@ -73,20 +73,20 @@
 
 **MVP Note**: Uses magentic orchestration for MVP. A research task (T095) will evaluate alternative orchestration approaches for production.
 
-### Phase A: Infrastructure Deployment (US5)
+### Phase A: Infrastructure Deployment (US5) ✅ COMPLETE
 
-- [ ] T015 [P] [US5] Create Manager Agent instructions in src/deployment/agent_definitions/manager_instructions.md (coordination rules, enforces triage-first behavior, agent selection criteria, plan creation format)
-- [ ] T016 [US5] Implement agent deployment script in src/deployment/deploy_agents.py (uses azure-ai-projects SDK, creates v2 agents with AIProjectClient.agents.create_version(), deploys manager agent only for this phase)
-- [ ] T017 [US5] Create CLI command in src/demo/cli.py for deploying agents (python -m src.demo.cli deploy)
+- [X] T015 [P] [US5] Create Manager Agent instructions in src/deployment/agent_definitions/manager_instructions.md (coordination rules, enforces triage-first behavior, agent selection criteria, plan creation format)
+- [X] T016 [US5] Implement agent deployment script in src/deployment/deploy_agents.py (uses azure-ai-projects SDK, creates v2 agents with AIProjectClient.agents.create_version(), deploys manager agent only for this phase)
+- [X] T017 [US5] Create CLI command in src/demo/cli.py for deploying agents (python -m src.demo.cli deploy)
 
-### Phase B: Runtime Orchestration (US5)
+### Phase B: Runtime Orchestration (US5) ✅ COMPLETE
 
-- [ ] T018 [US5] Implement magentic orchestrator setup in src/orchestration/orchestrator.py (create_workflow() function with MagenticBuilder, plugin point clearly documented, manager agent discovery)
-- [ ] T019 [P] [US5] Implement workflow execution module in src/orchestration/workflows.py (run_workflow() function with event streaming, AgentRunUpdateEvent handling, progress tracking)
-- [ ] T020 [US5] Create demo main script in src/demo/main.py (initializes workflow, loads mock data, streams events, displays agent interactions)
-- [ ] T021 [US5] Add CLI commands for running workflows in src/demo/cli.py (python -m src.demo.cli run-workflow <scenario_name>)
+- [X] T018 [US5] Implement magentic orchestrator setup in src/orchestration/orchestrator.py (create_workflow() function with MagenticBuilder, plugin point clearly documented, manager agent discovery)
+- [X] T019 [P] [US5] Implement workflow execution module in src/orchestration/workflows.py (run_workflow() function with event streaming, AgentRunUpdateEvent handling, progress tracking)
+- [X] T020 [US5] Create demo main script in src/demo/main.py (initializes workflow, loads mock data, streams events, displays agent interactions)
+- [X] T021 [US5] Add CLI commands for running workflows in src/demo/cli.py (python -m src.demo.cli run-workflow <scenario_name>)
 
-**Checkpoint**: At this point, orchestration infrastructure should be operational. Manager agent deployed, magentic workflow can be initialized and run (though without other agents yet).
+**Checkpoint**: Orchestration infrastructure operational ✅ Manager agent deployed, magentic workflow can be initialized and run (though without other agents yet).
 
 ---
 
