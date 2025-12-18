@@ -3,7 +3,7 @@
 **Feature Branch**: `001-agentic-soc`  
 **Created**: 2025-11-19  
 **Status**: Draft  
-**Input**: User description: "Create an Agentic Security Operations Center (SOC) system with AI agents for alert triage, threat hunting, incident response, and threat intelligence based on Azure AI Foundry and Microsoft Security services"
+**Input**: User description: "Create an Agentic Security Operations Center (SOC) system with AI agents for alert triage, threat hunting, incident response, and threat intelligence based on Microsoft Foundry and Microsoft Security services"
 
 ## Clarifications
 
@@ -190,7 +190,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-050**: System MUST provide dashboards and reporting for SOC management visibility
 - **FR-051**: System MUST support customization of agent behavior through configuration and feedback
 - **FR-052**: System MUST maintain explainability - all AI decisions must be transparent and understandable
-- **FR-053**: System MUST use Azure Managed Identity with Entra ID RBAC for agent authentication to Microsoft Security services, with configurable support for service principals with Azure Key Vault as an alternative
+- **FR-053**: System MUST use Azure Managed Identity OR service principals with least-privilege permissions for agent authentication to Microsoft Security services; Managed Identity with Entra ID RBAC is RECOMMENDED as the primary approach; Service principals with Azure Key Vault MAY be used as an alternative when Managed Identity is not available
 
 #### Performance Requirements (Hypothesized within industry standards. TODO: Need sources)
 

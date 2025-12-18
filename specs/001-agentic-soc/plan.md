@@ -7,7 +7,7 @@
 
 ## Summary
 
-The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry (AI Foundry) for cloud-hosted agent deployment and Microsoft Agent Framework's magentic orchestrator for demonstration workflows, following constitutional principles for safe, explainable, autonomous-but-supervised operations.
+The Agentic SOC MVP is an AI-first security operations platform that uses specialized AI agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) to augment human SOC analysts. The MVP will be demonstrable with simulated/mock data from the GUIDE and Attack datasets, focusing on the Alert Triage Agent as Priority 1. The system leverages Microsoft Foundry for cloud-hosted agent deployment and Microsoft Agent Framework's magentic orchestrator for demonstration workflows, following constitutional principles for safe, explainable, autonomous-but-supervised operations.
 
 **Primary Technical Approach**: 
 1. **Infrastructure Deployment** (separate process): Use `azure-ai-projects` SDK to create/discover cloud-hosted v2 agents in Microsoft Foundry, deployed as part of infrastructure setup
@@ -47,7 +47,7 @@ The Agentic SOC MVP is an AI-first security operations platform that uses specia
 
 **Target Platform**: 
 - Azure Container Apps (agent host environments)
-- Azure AI Foundry (agent runtime and model orchestration)
+- Microsoft Foundry (agent runtime and model orchestration)
 - Azure Event Hubs (event-driven triggers for agents)
 - Azure Functions (lightweight orchestration tasks, scheduled jobs)
 
@@ -85,7 +85,7 @@ Verify compliance with `.specify/memory/constitution.md`:
 
 - [x] **MVP/POC Scope**: Yes - System is demonstrable with GUIDE and Attack datasets (1.17M+ mock incidents). Clear "plugin points" defined for production integration (Sentinel API, Defender XDR API, Entra ID API). All integrations abstracted behind interfaces.
 
-- [x] **AI-First Security Operations**: Yes - Four core agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) implemented using Azure AI Foundry. Each agent is a top-level AI agent that may be composed of sub-agents, tools (KQL query generator, IOC enrichment), or knowledge sources (Attack dataset, MITRE ATT&CK mappings).
+- [x] **AI-First Security Operations**: Yes - Four core agents (Alert Triage, Threat Hunting, Incident Response, Threat Intelligence) implemented using Microsoft Foundry. Each agent is a top-level AI agent that may be composed of sub-agents, tools (KQL query generator, IOC enrichment), or knowledge sources (Attack dataset, MITRE ATT&CK mappings).
 
 - [x] **Agent Collaboration & Orchestration**: Yes - Microsoft Agent Framework orchestrates agent-to-agent communication. Context passed via Sentinel incident objects and Cosmos DB shared state. Event-driven triggers via Event Hubs. Escalation to humans via Teams approval workflows.
 
@@ -101,7 +101,7 @@ Verify compliance with `.specify/memory/constitution.md`:
 
 - [x] **Observability & Operational Excellence**: Yes - Structured logging with Azure Monitor and Application Insights. Metrics for latency, throughput, error rates, agent-specific KPIs. Distributed tracing with correlation IDs. Dashboards in Azure Monitor. Health endpoints for all services. Runbooks for common scenarios documented in `/docs/runbooks/`.
 
-- [x] **Technology Stack**: Yes - Azure AI Foundry (AI Foundry Client SDK) for all agents. Microsoft Agent Framework for orchestration. Microsoft Fabric considered for telemetry storage (Sentinel + Fabric hybrid approach). Logic Apps avoided. Alert Triage, Hunting, Response, and Intelligence agents properly implemented.
+- [x] **Technology Stack**: Yes - Microsoft Foundry for all agents. Microsoft Agent Framework for orchestration. Microsoft Fabric considered for telemetry storage (Sentinel + Fabric hybrid approach). Logic Apps avoided. Alert Triage, Hunting, Response, and Intelligence agents properly implemented.
 
 - [x] **Code Quality & CI/CD**: Yes - GitHub Actions CI/CD pipeline with automated testing, linting (black, pylint, mypy), security scanning (Dependabot, CodeQL). 80%+ unit test coverage enforced. Infrastructure as Code using Bicep. Automated deployment with approval gates.
 
@@ -111,7 +111,7 @@ Verify compliance with `.specify/memory/constitution.md`:
 
 - [x] **Production Deployment**: N/A for MVP - MVP uses mock data and does not require production deployment. However, production deployment guidance documented: Azure Landing Zone architecture, Azure Verified Modules, Cloud Adoption Framework alignment, Well-Architected Framework principles. Plugin points clearly defined for production integration.
 
-- [x] **Security & Compliance**: Yes - Azure Managed Identity with Entra ID RBAC for authentication. Service principals with Key Vault as fallback. Encrypted communication (HTTPS, Azure Private Link). Data classification respected. Sensitive data not logged in plaintext. Audit logs immutable. Data retention configurable (MVP default: 5 days).
+- [x] **Security & Compliance**: Yes - Azure Managed Identity with Entra ID RBAC (recommended primary approach) OR service principals with least-privilege permissions for agent authentication. Managed Identity recommended for production; service principals with Key Vault may be used as alternative when Managed Identity is not available. Encrypted communication (HTTPS, Azure Private Link). Data classification respected. Sensitive data not logged in plaintext. Audit logs immutable. Data retention configurable (MVP default: 5 days).
 
 *All constitutional principles are satisfied for the MVP scope.*
 
@@ -126,7 +126,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
 **Tools**: `azure-ai-projects` SDK (version 2.0.0b2 or later)
 
 **Process**:
-1. Connect to existing Azure AI Foundry workspace via environment variables (`PROJECT_ENDPOINT`, `MODEL_DEPLOYMENT_NAME`) or deploy new workspace if not available
+1. Connect to existing Microsoft Foundry workspace via environment variables (`PROJECT_ENDPOINT`, `MODEL_DEPLOYMENT_NAME`) or deploy new workspace if not available
 2. Use `AIProjectClient.agents.create_version()` to create persistent v2 agents:
    - Alert Triage Agent with instructions for risk scoring and prioritization
    - Threat Hunting Agent with instructions for query generation and anomaly detection
@@ -138,7 +138,7 @@ The MVP follows a clear separation between infrastructure deployment and demonst
    - Detailed instructions (system prompt defining behavior)
    - Model deployment reference (e.g., "gpt-4.1-mini")
    - NO tools initially (focus on instruction quality) - tools will be added in later phases
-4. Agents persist in Azure AI Foundry and can be discovered by name/ID
+4. Agents persist in Microsoft Foundry and can be discovered by name/ID
 
 **Output**: Cloud-hosted agents that can be referenced by name in demonstration code
 
@@ -366,7 +366,7 @@ src/
 infra/
 ├── main.bicep                       # Main infrastructure template
 ├── modules/                         # Bicep modules
-│   ├── ai-foundry.bicep             # AI Foundry workspace
+│   ├── microsoft-foundry.bicep             # AI Foundry workspace
 │   ├── container-apps.bicep         # Container Apps for agents
 │   ├── cosmos.bicep                 # Cosmos DB
 │   ├── event-hubs.bicep             # Event Hubs for triggers
