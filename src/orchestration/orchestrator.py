@@ -5,11 +5,10 @@ Implements magentic workflow creation with clear plugin point for alternative st
 """
 
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from agent_framework import MagenticBuilder
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import Agent
 
 from src.shared.auth import get_project_credential, get_project_endpoint
 from src.shared.logging import get_logger
@@ -63,12 +62,12 @@ class SOCOrchestrator:
             max_stalls=max_stall_count,
         )
 
-    def discover_agents(self) -> Dict[str, Agent]:
+    def discover_agents(self) -> Dict[str, Any]:
         """
         Discover deployed agents in Microsoft Foundry.
 
         Returns:
-            Dictionary mapping agent role to Agent instance
+            Dictionary mapping agent role to agent object
 
         Note:
             Agent roles: manager, triage, hunting, response, intelligence
@@ -84,14 +83,25 @@ class SOCOrchestrator:
             "intelligence": "ThreatIntelligenceAgent",
         }
 
+        # List all agents once and filter by name
+        try:
+            all_agents = list(self.client.agents.list_agents())
+        except Exception as e:
+            logger.error("Failed to list agents", error=str(e))
+            all_agents = []
+
         for role, name in agent_mapping.items():
             try:
-                agent = self.client.agents.get_agent(agent_name=name)
-                agents[role] = agent
-                logger.info("Agent discovered", role=role, name=name, agent_id=agent.id)
+                # Find agent by name
+                agent = next((a for a in all_agents if a.name == name), None)
+                if agent:
+                    agents[role] = agent
+                    logger.info("Agent discovered", role=role, name=name, agent_id=agent.id)
+                else:
+                    logger.warning("Agent not found", role=role, name=name)
             except Exception as e:
                 logger.warning(
-                    "Agent not found",
+                    "Agent discovery error",
                     role=role,
                     name=name,
                     error=str(e),
@@ -104,7 +114,7 @@ class SOCOrchestrator:
         logger.info("Agent discovery complete", agent_count=len(agents))
         return agents
 
-    def create_workflow(self, agents: Optional[Dict[str, Agent]] = None):
+    def create_workflow(self, agents: Optional[Dict[str, Any]] = None):
         """
         Create magentic workflow with discovered agents.
 

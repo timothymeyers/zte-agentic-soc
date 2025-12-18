@@ -7,10 +7,9 @@ Deploys AI agents to Microsoft Foundry using azure-ai-projects SDK.
 import asyncio
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import Agent
 from azure.core.exceptions import ResourceNotFoundError
 
 from src.shared.auth import get_project_credential, get_project_endpoint, get_openai_deployment
@@ -84,7 +83,7 @@ class AgentDeployer:
         name: str,
         instructions_file: str,
         description: str,
-    ) -> Agent:
+    ) -> Any:
         """
         Deploy a specialized agent to Microsoft Foundry.
 
@@ -94,7 +93,7 @@ class AgentDeployer:
             description: Agent description
 
         Returns:
-            Deployed Agent instance
+            Deployed agent object (AgentObject from azure.ai.projects)
         """
         logger.info("Deploying agent", name=name, instructions_file=instructions_file)
 
@@ -102,17 +101,18 @@ class AgentDeployer:
         instructions = self._load_instructions(instructions_file)
 
         try:
-            # Check if agent already exists
+            # Check if agent already exists by listing and filtering by name
             try:
-                existing_agent = self.client.agents.get_agent(agent_name=name)
-                logger.info(
-                    "Agent already exists",
-                    agent_id=existing_agent.id,
-                    name=name,
-                )
-                return existing_agent
-            except (ResourceNotFoundError, AttributeError):
-                # Agent doesn't exist, create new one
+                existing_agent = self.get_agent(name)
+                if existing_agent:
+                    logger.info(
+                        "Agent already exists",
+                        agent_id=existing_agent.id,
+                        name=name,
+                    )
+                    return existing_agent
+            except Exception:
+                # Continue to create new agent
                 pass
 
             # Create new agent
@@ -141,12 +141,12 @@ class AgentDeployer:
             )
             raise
 
-    def list_agents(self) -> List[Agent]:
+    def list_agents(self) -> List[Any]:
         """
         List all deployed agents in the project.
 
         Returns:
-            List of Agent instances
+            List of agent objects
         """
         try:
             agents = self.client.agents.list_agents()
@@ -159,7 +159,7 @@ class AgentDeployer:
             logger.error("Failed to list agents", error=str(e), exc_info=True)
             raise
 
-    def get_agent(self, name: str) -> Optional[Agent]:
+    def get_agent(self, name: str) -> Optional[Any]:
         """
         Get a deployed agent by name.
 
@@ -167,14 +167,16 @@ class AgentDeployer:
             name: Agent name
 
         Returns:
-            Agent instance or None if not found
+            Agent object or None if not found
         """
         try:
-            agent = self.client.agents.get_agent(agent_name=name)
-            logger.info("Retrieved agent", name=name, agent_id=agent.id)
-            return agent
+            # azure-ai-agents SDK doesn't have get_by_name, so list and filter
+            agents = self.client.agents.list_agents()
+            for agent in agents:
+                if agent.name == name:
+                    logger.info("Retrieved agent", name=name, agent_id=agent.id)
+                    return agent
 
-        except (ResourceNotFoundError, AttributeError):
             logger.warning("Agent not found", name=name)
             return None
 
@@ -245,7 +247,7 @@ AGENT_DEFINITIONS = {
 # =============================================================================
 
 
-async def deploy_all_agents(agent_keys: Optional[List[str]] = None) -> Dict[str, Agent]:
+async def deploy_all_agents(agent_keys: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Deploy multiple agents to Microsoft Foundry.
 
@@ -254,7 +256,7 @@ async def deploy_all_agents(agent_keys: Optional[List[str]] = None) -> Dict[str,
                    If None, deploys all defined agents.
 
     Returns:
-        Dictionary mapping agent key to deployed Agent instance
+        Dictionary mapping agent key to deployed agent object
 
     Example:
         >>> agents = await deploy_all_agents(["manager"])
@@ -285,12 +287,12 @@ async def deploy_all_agents(agent_keys: Optional[List[str]] = None) -> Dict[str,
     return deployed
 
 
-async def list_deployed_agents() -> List[Agent]:
+async def list_deployed_agents() -> List[Any]:
     """
     List all deployed agents.
 
     Returns:
-        List of Agent instances
+        List of agent objects
     """
     deployer = AgentDeployer()
     return deployer.list_agents()
