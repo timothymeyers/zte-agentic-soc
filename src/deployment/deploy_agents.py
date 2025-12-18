@@ -79,66 +79,6 @@ class AgentDeployer:
         logger.info("Instructions loaded", filename=filename, size=len(content))
         return content
 
-    def deploy_manager_agent(
-        self,
-        name: str = "SOC_Manager",
-        description: str = "SOC Manager Agent - Coordinates multi-agent security workflows",
-    ) -> Agent:
-        """
-        Deploy the Manager Agent to Microsoft Foundry.
-
-        Args:
-            name: Agent name
-            description: Agent description
-
-        Returns:
-            Deployed Agent instance
-        """
-        logger.info("Deploying Manager Agent", name=name)
-
-        # Load instructions
-        instructions = self._load_instructions("manager_instructions.md")
-
-        try:
-            # Check if agent already exists
-            try:
-                existing_agent = self.client.agents.get_agent(agent_name=name)
-                logger.info(
-                    "Manager Agent already exists",
-                    agent_id=existing_agent.id,
-                    name=name,
-                )
-                return existing_agent
-            except (ResourceNotFoundError, AttributeError):
-                # Agent doesn't exist, create new one
-                pass
-
-            # Create new agent
-            agent = self.client.agents.create_agent(
-                model=self.model_deployment,
-                name=name,
-                instructions=instructions,
-                description=description,
-            )
-
-            logger.info(
-                "Manager Agent deployed successfully",
-                agent_id=agent.id,
-                name=name,
-                model=self.model_deployment,
-            )
-
-            return agent
-
-        except Exception as e:
-            logger.error(
-                "Failed to deploy Manager Agent",
-                name=name,
-                error=str(e),
-                exc_info=True,
-            )
-            raise
-
     def deploy_agent(
         self,
         name: str,
@@ -333,17 +273,11 @@ async def deploy_all_agents(agent_keys: Optional[List[str]] = None) -> Dict[str,
 
         definition = AGENT_DEFINITIONS[key]
 
-        if key == "manager":
-            agent = deployer.deploy_manager_agent(
-                name=definition["name"],
-                description=definition["description"],
-            )
-        else:
-            agent = deployer.deploy_agent(
-                name=definition["name"],
-                instructions_file=definition["instructions_file"],
-                description=definition["description"],
-            )
+        agent = deployer.deploy_agent(
+            name=definition["name"],
+            instructions_file=definition["instructions_file"],
+            description=definition["description"],
+        )
 
         deployed[key] = agent
 
