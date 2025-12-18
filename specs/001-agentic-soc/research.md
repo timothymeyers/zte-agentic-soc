@@ -10,7 +10,7 @@ This document consolidates technology research findings and architectural decisi
 
 Research conducted using:
 - Microsoft Learn documentation (official Azure and Security documentation)
-- Azure AI Foundry and Microsoft Agent Framework documentation
+- Microsoft Foundry and Microsoft Agent Framework documentation
 - Microsoft Security Copilot developer resources
 - KQL and Microsoft Sentinel documentation
 - Security best practices and architectural patterns
@@ -19,9 +19,9 @@ Research conducted using:
 
 ## 1. Microsoft Foundry (AI Foundry) Integration
 
-### Decision: Use Azure AI Foundry with Python SDK
+### Decision: Use Microsoft Foundry with Python SDK
 
-**Rationale**: Azure AI Foundry provides the most comprehensive, enterprise-ready platform for building AI agents with built-in support for:
+**Rationale**: Microsoft Foundry provides the most comprehensive, enterprise-ready platform for building AI agents with built-in support for:
 - Persistent agent instances with managed conversation threads
 - Integration with Azure OpenAI models (GPT-4, embeddings)
 - Native authentication via Azure Managed Identity
@@ -76,7 +76,7 @@ async def create_triage_agent():
 - **Self-hosted LLMs**: No support for production-grade security models. Rejected for MVP.
 
 **References**:
-- [Azure AI Foundry Agents Python Documentation](https://learn.microsoft.com/en-us/agent-framework/user-guide/agents/agent-types/azure-ai-foundry-agent)
+- [Microsoft Foundry Agents Python Documentation](https://learn.microsoft.com/en-us/agent-framework/user-guide/agents/agent-types/azure-ai-foundry-agent)
 - [Agent Development Lifecycle](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/development-lifecycle?view=foundry)
 
 ---
@@ -643,7 +643,7 @@ traces
 **Why Azure AI Search**:
 - **Agentic Retrieval** (preview): Purpose-built for AI agents with intelligent query decomposition
 - **Hybrid Search**: Combines vector similarity + keyword matching for best relevance
-- **Integration**: Native integration with Azure AI Foundry Agent Framework
+- **Integration**: Native integration with Microsoft Foundry Agent Framework
 - **Performance**: Sub-second retrieval latency, scales to millions of documents
 - **Security**: Integrated with Azure Entra ID, supports document-level security
 
@@ -800,7 +800,7 @@ async def create_triage_agent_with_knowledge():
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| **AI Platform** | Azure AI Foundry with Python SDK | Enterprise-ready, persistent agents, managed infrastructure |
+| **AI Platform** | Microsoft Foundry with Python SDK | Enterprise-ready, persistent agents, managed infrastructure |
 | **Orchestration** | Microsoft Agent Framework + Event Hubs | Standardized A2A communication, event-driven architecture |
 | **Security Copilot** | Plugin points defined, not implemented in MVP | Production integration path documented, not required for demo |
 | **Query Language** | KQL with LLM-powered generation | Industry standard for Sentinel/Defender, powerful analytics |
@@ -826,7 +826,7 @@ from azure.ai.projects import AIProjectClient, PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
 import os
 
-# Connect to Azure AI Foundry workspace
+# Connect to Microsoft Foundry workspace
 project_client = AIProjectClient.from_connection_string(
     connection_string=os.environ["PROJECT_CONNECTION_STRING"],
     credential=DefaultAzureCredential()
@@ -894,7 +894,7 @@ from azure.ai.projects import AIProjectClient, PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
 
 async def deploy_all_agents():
-    """Deploy all SOC agents to Azure AI Foundry"""
+    """Deploy all SOC agents to Microsoft Foundry"""
     
     project_client = AIProjectClient.from_connection_string(
         connection_string=os.environ["PROJECT_CONNECTION_STRING"],
@@ -2199,6 +2199,155 @@ workflow = create_workflow(agents, orchestration_type="custom")
 **References**:
 - [Agent Framework Orchestration Patterns](https://learn.microsoft.com/en-us/agent-framework/user-guide/workflows/)
 - [Azure Durable Functions](https://learn.microsoft.com/en-us/azure/azure-functions/durable/)
+
+---
+
+## 14. Azure SDK Layer Clarification: Phase A vs Phase B
+
+### Two-Phase Architecture Explained
+
+**Terminology Confusion**: The terms "Microsoft Foundry" and "Microsoft Agent Framework" are sometimes used interchangeably, but they serve distinct purposes in our MVP architecture.
+
+#### Phase A: Infrastructure Deployment (azure-ai-projects SDK)
+
+**Purpose**: Deploy persistent, cloud-hosted v2 agents to Microsoft Foundry
+
+**SDK**: `azure-ai-projects` (version 2.0.0b2+)
+
+**What it does**:
+- Creates and configures cloud-hosted agents in Microsoft Foundry service
+- Agents persist in the cloud and can be referenced by name/ID
+- Provides `AIProjectClient.agents.create_version()` for agent deployment
+- Enables agent discovery via `get_agent()`, `list_agents()`, `list_versions()`
+- Agents are configured with instructions (system prompts), model references, and tools
+
+**Usage**:
+```python
+from azure.ai.projects import AIProjectClient, PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
+
+# Deploy agent to Microsoft Foundry (one-time setup)
+project_client = AIProjectClient.from_connection_string(
+    connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+    credential=DefaultAzureCredential()
+)
+
+agent = project_client.agents.create_version(
+    agent_name="AlertTriageAgent",
+    definition=PromptAgentDefinition(
+        model="gpt-4.1-mini",
+        instructions="You are an expert SOC analyst..."
+    )
+)
+```
+
+**Key Point**: This is about **agent creation and configuration**, not orchestration.
+
+#### Phase B: Runtime Orchestration (agent-framework)
+
+**Purpose**: Orchestrate deployed agents at runtime using coordination patterns
+
+**Package**: `agent-framework` (Microsoft Agent Framework)
+
+**What it does**:
+- Provides orchestration patterns (magentic, sequential, concurrent, custom)
+- Coordinates agent-to-agent communication at runtime
+- Requires **wrapper** around Foundry agents to participate in orchestration
+- Implements `MagenticBuilder`, `ChatAgent`, `Workflow` abstractions
+- Manages conversation flow, state passing, and human-in-the-loop
+
+**Usage**:
+```python
+from agent_framework import MagenticBuilder
+from azure.ai.projects import AIProjectClient
+
+# Discover deployed agents (Phase A)
+project_client = AIProjectClient.from_connection_string(...)
+triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
+
+# Wrap in Agent Framework for orchestration (Phase B)
+workflow = (
+    MagenticBuilder()
+    .participants(triage=triage_agent)  # Wrapper applied internally
+    .with_standard_manager(...)
+    .build()
+)
+
+# Run orchestrated workflow
+async for event in workflow.run(task):
+    # Process events
+    pass
+```
+
+**Key Point**: This is about **agent orchestration and coordination**, not deployment.
+
+#### The Wrapper Requirement
+
+**Why a wrapper is needed**:
+- `azure-ai-projects` agents are cloud-hosted Foundry agents (accessed via REST API)
+- `agent-framework` expects agents that implement its `ChatAgent` interface
+- The wrapper translates between these two interfaces
+
+**Where the wrapper happens**:
+- **Option 1 (Implicit)**: `MagenticBuilder.participants()` may handle wrapping internally
+- **Option 2 (Explicit)**: Create wrapper class that implements `ChatAgent` interface:
+
+```python
+from agent_framework import ChatAgent, ChatMessage, Role
+
+class FoundryAgentWrapper(ChatAgent):
+    """Wraps a Foundry agent for Agent Framework orchestration"""
+    
+    def __init__(self, foundry_agent, project_client):
+        self.foundry_agent = foundry_agent
+        self.project_client = project_client
+        self.openai_client = project_client.get_openai_client()
+    
+    async def run(self, messages: list[ChatMessage]) -> ChatMessage:
+        # Convert Agent Framework messages to Foundry conversation format
+        conversation = self.openai_client.conversations.create(
+            items=[{"type": "message", "role": msg.role, "content": msg.content} 
+                   for msg in messages]
+        )
+        
+        # Call Foundry agent
+        response = self.openai_client.responses.create(
+            conversation=conversation.id,
+            extra_body={"agent": {"name": self.foundry_agent.name, "type": "agent_reference"}},
+            input=""
+        )
+        
+        # Convert response to Agent Framework message
+        return ChatMessage(role=Role.ASSISTANT, content=response.output_text)
+
+# Use wrapped agent in orchestration
+wrapped_agent = FoundryAgentWrapper(triage_agent, project_client)
+workflow = MagenticBuilder().participants(triage=wrapped_agent).build()
+```
+
+#### Summary: Phase A vs Phase B
+
+| Aspect | Phase A (Deployment) | Phase B (Orchestration) |
+|--------|---------------------|------------------------|
+| **SDK/Package** | `azure-ai-projects` | `agent-framework` |
+| **Purpose** | Deploy agents to cloud | Orchestrate agents at runtime |
+| **Key Classes** | `AIProjectClient`, `PromptAgentDefinition` | `MagenticBuilder`, `ChatAgent`, `Workflow` |
+| **Output** | Persistent cloud-hosted agents | Runtime workflows and coordination |
+| **Frequency** | One-time (or per deployment) | Every execution |
+| **MVP Note** | Deploy 5 agents (triage, hunting, response, intel, manager) | Use magentic orchestration for demos |
+
+#### Research Task Created
+
+A research task will be added to tasks.md to evaluate orchestration approaches beyond magentic for production scenarios, including:
+- Sequential orchestration (predictable workflows)
+- Concurrent orchestration (parallel execution)
+- Custom orchestrator (organization-specific logic)
+- Azure Durable Functions (production scale)
+
+**References**:
+- [Azure AI Projects SDK Documentation](https://azuresdkdocs.z19.web.core.windows.net/python/azure-ai-projects/2.0.0b2/)
+- [Microsoft Agent Framework Documentation](https://learn.microsoft.com/en-us/agent-framework/)
+- [Agent Framework Architecture Overview](https://learn.microsoft.com/en-us/agent-framework/concepts/)
 
 ---
 
