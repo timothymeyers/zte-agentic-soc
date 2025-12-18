@@ -10,7 +10,7 @@
 ### Session 2025-11-20
 
 - Q: Which authentication mechanism should agents use to access Microsoft Security services (Sentinel, Defender, Entra ID)? → A: Azure Managed Identity with Entra ID RBAC (Option B), with configuration support for service principals with Azure Key Vault (Option A) as an alternative (implementation not required for MVP)
-- Q: What is the data retention requirement for security telemetry and audit logs? → A: Configurable retention with MVP default of 5 days hot storage
+- Q: What is the data retention requirement for security telemetry and audit logs? → A: Configurable retention with MVP default of 5 days hot storage in Cosmos DB with TTL settings; post-MVP will implement tiered storage strategy with cold storage in Azure Blob Storage or Microsoft Fabric for long-term retention (30-90 days) and compliance archival
 - Q: Which containment actions should require human approval before execution? → A: Risk-scored threshold where actions on critical assets or irreversible operations require approval (Option C), with configurable thresholds and reasonable MVP demonstration limits
 - Q: What alert/event format should the Alert Triage Agent expect as input? → A: Microsoft Sentinel/Graph Security API format as canonical schema (Option B)
 - Q: What are the incident lifecycle states? → A: New → Investigating → Contained → Resolved → Closed
@@ -129,7 +129,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-004**: System MUST filter false positive alerts based on known benign patterns and organizational context
 - **FR-005**: System MUST provide clear explanations for alert prioritization decisions
 - **FR-006**: System MUST enrich high-priority alerts with relevant context (asset value, user role, data sensitivity, threat intelligence)
-- **FR-007**: System MUST learn from analyst feedback to improve prioritization accuracy over time
+- **FR-007**: System MUST learn from analyst feedback to improve prioritization accuracy over time (post-MVP: feedback collection and model adaptation deferred to production phase)
 - **FR-008**: System MUST generate prioritized alert queues or labeled incidents for analyst review
 
 #### Threat Hunting Agent Requirements
@@ -151,7 +151,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-020**: System MUST block malicious indicators at relevant security controls (firewall, email gateway, web proxy)
 - **FR-021**: System MUST terminate malicious processes or scheduled tasks on affected systems
 - **FR-022**: System MUST document all response actions with timestamps, rationale, and outcomes
-- **FR-023**: System MUST follow configurable approval workflows for high-risk actions, using risk-scored thresholds where actions on critical assets or irreversible operations require human approval
+- **FR-023**: System MUST follow configurable approval workflows for high-risk actions, using risk-scored thresholds where actions on critical assets or irreversible operations require human approval. Examples of actions requiring approval: (1) Disabling accounts with administrative privileges, (2) Isolating production database servers or domain controllers, (3) Blocking IP ranges that may affect business operations, (4) Deleting or quarantining files from critical systems. Low-risk actions that may proceed autonomously: (1) Isolating non-critical workstations, (2) Disabling standard user accounts, (3) Blocking known-malicious indicators with high confidence
 - **FR-024**: System MUST support multi-step response playbooks for different incident types
 - **FR-025**: System MUST coordinate recovery actions (restore from backup, rebuild systems, reset credentials)
 - **FR-026**: System MUST verify that backdoors and persistence mechanisms are removed
@@ -174,7 +174,7 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-037**: System MUST trigger appropriate agents based on events, schedules, or analyst requests
 - **FR-038**: System MUST support parallel execution of independent agent tasks
 - **FR-039**: System MUST escalate to human analysts when automated capabilities are exceeded or policy requires approval
-- **FR-040**: System MUST resolve conflicting recommendations from multiple agents or escalate to humans
+- **FR-040**: System MUST resolve conflicting recommendations from multiple agents or escalate to humans (MVP: handled by manager agent's internal reasoning and escalation logic; post-MVP: may implement explicit conflict resolution algorithms)
 - **FR-041**: System MUST maintain complete audit logs of all agent decisions and actions
 - **FR-042**: System MUST support configurable automation policies aligned with organizational risk tolerance
 - **FR-043**: System MUST gracefully degrade when services are unavailable and alert humans to failures
@@ -186,20 +186,22 @@ As a SOC operation, I need all AI agents to work together seamlessly - sharing c
 - **FR-046**: System MUST scale to handle thousands of alerts per day and large volumes of telemetry data
 - **FR-047**: System MUST operate continuously (24x7) with high availability
 - **FR-048**: System MUST maintain data privacy and security for sensitive security information
-- **FR-049**: System MUST comply with configurable data retention requirements (MVP default: 5 days hot storage) and evidence preservation requirements
+- **FR-049**: System MUST comply with configurable data retention requirements (MVP default: 5 days hot storage in Cosmos DB with TTL; post-MVP: tiered storage with 30-90 day cold storage in Azure Blob Storage or Microsoft Fabric for compliance archival) and evidence preservation requirements
 - **FR-050**: System MUST provide dashboards and reporting for SOC management visibility
 - **FR-051**: System MUST support customization of agent behavior through configuration and feedback
 - **FR-052**: System MUST maintain explainability - all AI decisions must be transparent and understandable
-- **FR-053**: System MUST use Azure Managed Identity OR service principals with least-privilege permissions for agent authentication to Microsoft Security services; Managed Identity with Entra ID RBAC is RECOMMENDED as the primary approach; Service principals with Azure Key Vault MAY be used as an alternative when Managed Identity is not available
+- **FR-053**: System MUST use Azure Managed Identity with Entra ID RBAC for agent authentication to Microsoft Security services in the MVP; Service principals with Azure Key Vault and more robust authentication mechanisms MAY be implemented in post-MVP phases when additional security requirements are identified
 
-#### Performance Requirements (Hypothesized within industry standards. TODO: Need sources)
+#### Performance Requirements (Post-MVP Targets)
 
-- **FR-054**: Alert ingestion MUST process incoming alerts with latency < 2 seconds at 95th percentile
-- **FR-055**: Alert triage MUST complete analysis within 5 seconds at 95th percentile
-- **FR-056**: Containment actions MUST execute within 60 seconds at 95th percentile
-- **FR-057**: Hunt queries MUST complete within 30 seconds at 95th percentile for Microsoft Sentinel queries, and within 5 minutes at 95th percentile for Microsoft Fabric deep search queries
-- **FR-058**: System MUST sustain processing of 10,000 alerts/day in MVP deployment, scaling to 100,000+ alerts/day in production deployment
-- **FR-059**: System MUST maintain 99.5% uptime (maximum 43 minutes downtime per month) for critical detection and response functions
+**Note**: The following performance targets are aspirational goals for post-MVP production deployment. MVP focuses on demonstrable functionality with mock data and does not require meeting these specific performance thresholds.
+
+- **FR-054**: Alert ingestion SHOULD process incoming alerts with latency < 2 seconds at 95th percentile (post-MVP target)
+- **FR-055**: Alert triage SHOULD complete analysis within 5 seconds at 95th percentile (post-MVP target)
+- **FR-056**: Containment actions SHOULD execute within 60 seconds at 95th percentile (post-MVP target)
+- **FR-057**: Hunt queries SHOULD complete within 30 seconds at 95th percentile for Microsoft Sentinel queries, and within 5 minutes at 95th percentile for Microsoft Fabric deep search queries (post-MVP target)
+- **FR-058**: System SHOULD sustain processing of 10,000 alerts/day in production deployment, scaling to 100,000+ alerts/day as needed (post-MVP target; MVP demonstrates with mock data at configurable rates)
+- **FR-059**: System SHOULD maintain 99.5% uptime (maximum 43 minutes downtime per month) for critical detection and response functions in production deployment (post-MVP target)
 
 ### Key Entities
 

@@ -164,7 +164,7 @@ The Agentic SOC MUST implement four specialized agents as the minimum viable arc
 
 ### Technology Stack
 
-- **AI Platform**: Microsoft Foundry (AI Foundry) with AI Foundry Client interface MUST be the primary AI infrastructure
+- **AI Platform**: Microsoft Foundry MUST be the primary AI infrastructure, accessed via the azure-ai-projects SDK
 - **SIEM/XDR**: Microsoft Sentinel and Microsoft Defender XDR SHOULD be the core security platforms for production scenarios
 - **Orchestration**: Microsoft Foundry or Microsoft Agent Framework MUST coordinate workflows and agent-to-agent communication
 - **Data Storage**: Microsoft Fabric SHOULD be leveraged for scalable security telemetry storage; Azure Monitor / Log Analytics workspaces MAY be used; Shared agent context MUST use appropriate storage (Fabric, Cosmos DB, or Sentinel incident fields)
