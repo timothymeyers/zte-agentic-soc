@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 from azure.core.exceptions import ResourceNotFoundError
 
 from src.shared.auth import get_project_credential, get_project_endpoint, get_openai_deployment
@@ -37,9 +37,9 @@ class AgentDeployer:
         self.model_deployment = model_deployment or get_openai_deployment()
         self.credential = get_project_credential()
 
-        # Initialize AI Project Client
-        self.client = AIProjectClient.from_connection_string(
-            conn_str=self.project_endpoint,
+        # Initialize AgentsClient
+        self.client = AgentsClient(
+            endpoint=self.project_endpoint,
             credential=self.credential
         )
 
@@ -115,8 +115,8 @@ class AgentDeployer:
                 # Continue to create new agent
                 pass
 
-            # Create new agent
-            agent = self.client.agents.create_agent(
+            # Create new agent using azure-ai-agents API
+            agent = self.client.create_agent(
                 model=self.model_deployment,
                 name=name,
                 instructions=instructions,
@@ -149,7 +149,7 @@ class AgentDeployer:
             List of agent objects
         """
         try:
-            agents = self.client.agents.list_agents()
+            agents = self.client.list_agents()
             agent_list = list(agents)
 
             logger.info("Listed agents", count=len(agent_list))
@@ -171,7 +171,7 @@ class AgentDeployer:
         """
         try:
             # azure-ai-agents SDK doesn't have get_by_name, so list and filter
-            agents = self.client.agents.list_agents()
+            agents = self.client.list_agents()
             for agent in agents:
                 if agent.name == name:
                     logger.info("Retrieved agent", name=name, agent_id=agent.id)
@@ -199,7 +199,7 @@ class AgentDeployer:
             if not agent:
                 return False
 
-            self.client.agents.delete_agent(agent.id)
+            self.client.delete_agent(agent.id)
             logger.info("Agent deleted", name=name, agent_id=agent.id)
             return True
 

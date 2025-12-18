@@ -23,7 +23,8 @@ classifiers = [
 
 dependencies = [
     # Microsoft Foundry and Agent Framework
-    "azure-ai-projects>=1.0.0b2",
+    "azure-ai-projects==1.0.0b3",
+    "azure-ai-agents>=1.1.0",
     "agent-framework>=1.0.0b251001",
     
     # Azure SDK Core

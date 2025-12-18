@@ -819,39 +819,40 @@ async def create_triage_agent_with_knowledge():
 
 **Implementation Approach**:
 
-**IMPORTANT - Correct SDK Usage (azure-ai-projects 1.0.0 + azure-ai-agents)**:
+**IMPORTANT - Correct SDK Usage (azure-ai-agents 1.1.0 + azure-ai-projects 1.0.0b3)**:
 
-The `AIProjectClient.agents` property provides an authenticated `AgentsClient` from the `azure-ai-agents` package. 
+**Recommended Approach**: Use `AgentsClient` directly from `azure-ai-agents` package.
 
 **Correct imports**:
 ```python
-from azure.ai.projects import AIProjectClient  # DO use this
+from azure.ai.agents import AgentsClient  # Recommended: Direct usage
 from azure.identity import DefaultAzureCredential
 from typing import Any  # Use Any for agent type hints
 
-# DO NOT import these - they don't exist:
-# from azure.ai.projects.models import Agent  # ❌ Does not exist
-# from azure.ai.projects import PromptAgentDefinition  # ❌ Not available in 1.0.0
+# Alternative (also works):
+# from azure.ai.projects import AIProjectClient
+# client = AIProjectClient.from_connection_string(...).agents  # Returns AgentsClient
 ```
 
 **Agent objects**: Agents returned by the SDK are dictionary-like objects (compatible with MutableMapping), not a specific `Agent` class.
 
-1. **Agent Creation with `create_agent()`**:
+1. **Agent Creation with `AgentsClient`**:
 
 ```python
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
 import os
 
 # Connect to Microsoft Foundry workspace
-project_client = AIProjectClient.from_connection_string(
-    conn_str=os.environ["PROJECT_CONNECTION_STRING"],
+# Use AgentsClient directly for agent management
+client = AgentsClient(
+    endpoint=os.environ["AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"],
     credential=DefaultAzureCredential()
 )
 
-# Create an agent using azure-ai-agents SDK methods
+# Create an agent using azure-ai-agents 1.1.0 SDK
 # Returns agent object (dictionary-like), not a specific Agent class
-agent = project_client.agents.create_agent(
+agent = client.create_agent(
     model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
     name="AlertTriageAgent",
     instructions="""
@@ -880,23 +881,24 @@ print(f"Agent created: {agent.name} (id: {agent.id})")
 
 ```python
 # List all agents in the workspace
-agents = project_client.agents.list_agents()
+agents = client.list_agents()
 for agent in agents:
     print(f"Agent: {agent.name} - {agent.description}")
 
 # Get a specific agent by name (must list and filter)
 # Note: get_agent() takes agent_id, not agent_name
-all_agents = list(project_client.agents.list_agents())
+all_agents = list(client.list_agents())
 triage_agent = next((a for a in all_agents if a.name == "AlertTriageAgent"), None)
 if triage_agent:
     print(f"Retrieved agent: {triage_agent.name} (id: {triage_agent.id})")
 
 # Get agent by ID (if you already have the ID)
-agent_by_id = project_client.agents.get_agent(agent_id="agent-12345")
+agent_by_id = client.get_agent(agent_id="asst_12345...")
 print(f"Agent: {agent_by_id.name}")
 
-# Note: Agent versioning methods may not be available in azure-ai-agents SDK
-# Check the SDK documentation for version management capabilities
+# Delete agent by ID
+client.delete_agent(agent_id="asst_12345...")
+print("Agent deleted")
 ```
 
 3. **Separation of Deployment from Orchestration**:

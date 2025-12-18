@@ -8,7 +8,7 @@ import os
 from typing import Any, Dict, Optional
 
 from agent_framework import MagenticBuilder
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 
 from src.shared.auth import get_project_credential, get_project_endpoint
 from src.shared.logging import get_logger
@@ -49,9 +49,9 @@ class SOCOrchestrator:
         self.max_stall_count = max_stall_count
         self.max_reset_count = max_reset_count
 
-        # Initialize AI Project Client
-        self.client = AIProjectClient.from_connection_string(
-            conn_str=self.project_endpoint,
+        # Initialize AgentsClient
+        self.client = AgentsClient(
+            endpoint=self.project_endpoint,
             credential=self.credential
         )
 
@@ -85,7 +85,7 @@ class SOCOrchestrator:
 
         # List all agents once and filter by name
         try:
-            all_agents = list(self.client.agents.list_agents())
+            all_agents = list(self.client.list_agents())
         except Exception as e:
             logger.error("Failed to list agents", error=str(e))
             all_agents = []
