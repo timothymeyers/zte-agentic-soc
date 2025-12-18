@@ -819,25 +819,42 @@ async def create_triage_agent_with_knowledge():
 
 **Implementation Approach**:
 
-1. **V2 Agent Creation with `create_version()`**:
+**IMPORTANT - Correct SDK Usage (azure-ai-projects 1.0.0 + azure-ai-agents)**:
+
+The `AIProjectClient.agents` property provides an authenticated `AgentsClient` from the `azure-ai-agents` package. 
+
+**Correct imports**:
+```python
+from azure.ai.projects import AIProjectClient  # DO use this
+from azure.identity import DefaultAzureCredential
+from typing import Any  # Use Any for agent type hints
+
+# DO NOT import these - they don't exist:
+# from azure.ai.projects.models import Agent  # ❌ Does not exist
+# from azure.ai.projects import PromptAgentDefinition  # ❌ Not available in 1.0.0
+```
+
+**Agent objects**: Agents returned by the SDK are dictionary-like objects (compatible with MutableMapping), not a specific `Agent` class.
+
+1. **Agent Creation with `create_agent()`**:
 
 ```python
-from azure.ai.projects import AIProjectClient, PromptAgentDefinition
+from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 import os
 
 # Connect to Microsoft Foundry workspace
 project_client = AIProjectClient.from_connection_string(
-    connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+    conn_str=os.environ["PROJECT_CONNECTION_STRING"],
     credential=DefaultAzureCredential()
 )
 
-# Create a cloud-hosted v2 agent with versioning
-agent = project_client.agents.create_version(
-    agent_name="AlertTriageAgent",
-    definition=PromptAgentDefinition(
-        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-        instructions="""
+# Create an agent using azure-ai-agents SDK methods
+# Returns agent object (dictionary-like), not a specific Agent class
+agent = project_client.agents.create_agent(
+    model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+    name="AlertTriageAgent",
+    instructions="""
 You are an expert SOC analyst specializing in alert triage and risk assessment.
 
 Your role is to analyze security alerts and provide:
@@ -848,17 +865,15 @@ Your role is to analyze security alerts and provide:
 
 Input format: You will receive security alerts in JSON format.
 Output format: Provide structured JSON with riskLevel, explanation, relatedAlerts, and nextSteps.
-        """,
-    ),
-    description="Alert triage and risk assessment agent v1.0",
+    """,
+    description="Alert triage and risk assessment agent",
     metadata={
-        "version": "1.0",
         "agent_type": "triage",
         "priority": "P1"
     }
 )
 
-print(f"Agent created: {agent.name} (version: {agent.version}, id: {agent.id})")
+print(f"Agent created: {agent.name} (id: {agent.id})")
 ```
 
 2. **Agent Discovery and Listing Patterns**:
@@ -869,20 +884,19 @@ agents = project_client.agents.list_agents()
 for agent in agents:
     print(f"Agent: {agent.name} - {agent.description}")
 
-# Get a specific agent by name
-triage_agent = project_client.agents.get_agent(agent_name="AlertTriageAgent")
-print(f"Retrieved agent: {triage_agent.name} (id: {triage_agent.id})")
+# Get a specific agent by name (must list and filter)
+# Note: get_agent() takes agent_id, not agent_name
+all_agents = list(project_client.agents.list_agents())
+triage_agent = next((a for a in all_agents if a.name == "AlertTriageAgent"), None)
+if triage_agent:
+    print(f"Retrieved agent: {triage_agent.name} (id: {triage_agent.id})")
 
-# List versions of a specific agent
-versions = project_client.agents.list_versions(agent_name="AlertTriageAgent")
-for version in versions:
-    print(f"Version: {version.version} - Created: {version.created_at}")
+# Get agent by ID (if you already have the ID)
+agent_by_id = project_client.agents.get_agent(agent_id="agent-12345")
+print(f"Agent: {agent_by_id.name}")
 
-# Get a specific version
-specific_version = project_client.agents.get_version(
-    agent_name="AlertTriageAgent",
-    agent_version="1.0"
-)
+# Note: Agent versioning methods may not be available in azure-ai-agents SDK
+# Check the SDK documentation for version management capabilities
 ```
 
 3. **Separation of Deployment from Orchestration**:
@@ -890,14 +904,15 @@ specific_version = project_client.agents.get_version(
 **Phase A: Infrastructure Deployment (One-time)**
 ```python
 # deploy_agents.py - Run once to create persistent agents
-from azure.ai.projects import AIProjectClient, PromptAgentDefinition
+from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
-async def deploy_all_agents():
+def deploy_all_agents():
     """Deploy all SOC agents to Microsoft Foundry"""
     
+    # Note: AIProjectClient.agents provides access to AgentsClient from azure-ai-agents package
     project_client = AIProjectClient.from_connection_string(
-        connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+        conn_str=os.environ["PROJECT_CONNECTION_STRING"],
         credential=DefaultAzureCredential()
     )
     
@@ -907,29 +922,35 @@ async def deploy_all_agents():
         "ThreatHuntingAgent": load_instructions("threat_hunting_instructions.md"),
         "IncidentResponseAgent": load_instructions("incident_response_instructions.md"),
         "ThreatIntelligenceAgent": load_instructions("threat_intelligence_instructions.md"),
-        "SOC_Coordinator": load_instructions("manager_instructions.md")
+        "SOC_Manager": load_instructions("manager_instructions.md")
     }
     
     deployed_agents = {}
     for agent_name, instructions in agent_definitions.items():
-        agent = project_client.agents.create_version(
-            agent_name=agent_name,
-            definition=PromptAgentDefinition(
-                model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-                instructions=instructions
-            ),
+        # Use create_agent() method from azure-ai-agents SDK
+        # Note: Returns agent object (dictionary-like), not a specific Agent class
+        agent = project_client.agents.create_agent(
+            model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+            name=agent_name,
+            instructions=instructions,
             description=f"{agent_name} for Agentic SOC MVP"
         )
         deployed_agents[agent_name] = agent
-        print(f"✓ Deployed: {agent_name} (version: {agent.version})")
+        print(f"✓ Deployed: {agent_name} (id: {agent.id})")
     
     return deployed_agents
 
 # Run deployment
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(deploy_all_agents())
+    deploy_all_agents()
 ```
+
+**Important SDK Notes**:
+- `AIProjectClient.agents` provides an authenticated `AgentsClient` from `azure-ai-agents` package
+- Agent objects are dictionary-like (compatible with MutableMapping), not a specific `Agent` class to import
+- Do NOT import `from azure.ai.projects.models import Agent` - this does not exist
+- Methods: `create_agent()`, `list_agents()`, `get_agent(agent_id)`, `delete_agent(agent_id)`
+- There is no `get_agent(agent_name=...)` - use `list_agents()` and filter by `agent.name` instead
 
 **Phase B: Runtime Orchestration (Demonstration)**
 ```python
@@ -937,22 +958,31 @@ if __name__ == "__main__":
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
-async def discover_agents():
+def discover_agents():
     """Discover pre-deployed agents for orchestration"""
     
     project_client = AIProjectClient.from_connection_string(
-        connection_string=os.environ["PROJECT_CONNECTION_STRING"],
+        conn_str=os.environ["PROJECT_CONNECTION_STRING"],
         credential=DefaultAzureCredential()
     )
     
     # Discover deployed agents by name
-    agents = {
-        "triage": project_client.agents.get_agent(agent_name="AlertTriageAgent"),
-        "hunting": project_client.agents.get_agent(agent_name="ThreatHuntingAgent"),
-        "response": project_client.agents.get_agent(agent_name="IncidentResponseAgent"),
-        "intel": project_client.agents.get_agent(agent_name="ThreatIntelligenceAgent"),
-        "manager": project_client.agents.get_agent(agent_name="SOC_Coordinator")
+    # Note: get_agent() takes agent_id, not agent_name. Must list and filter by name.
+    all_agents = list(project_client.agents.list_agents())
+    
+    agent_mapping = {
+        "triage": "AlertTriageAgent",
+        "hunting": "ThreatHuntingAgent",
+        "response": "IncidentResponseAgent",
+        "intel": "ThreatIntelligenceAgent",
+        "manager": "SOC_Manager"
     }
+    
+    agents = {}
+    for role, name in agent_mapping.items():
+        agent = next((a for a in all_agents if a.name == name), None)
+        if agent:
+            agents[role] = agent
     
     print(f"Discovered {len(agents)} agents for orchestration")
     return agents
