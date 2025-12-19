@@ -5,11 +5,12 @@ Implements magentic workflow creation with clear plugin point for alternative st
 """
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from agent_framework import MagenticBuilder
-from agent_framework.azure import AzureAIClient
-from azure.identity.aio import AzureCliCredential
+from agent_framework import ChatAgent, MagenticBuilder
+from agent_framework.azure import AzureOpenAIChatClient
+from azure.identity import AzureCliCredential
 
 from src.shared.auth import get_project_credential, get_project_endpoint
 from src.shared.logging import get_logger
@@ -25,7 +26,7 @@ class SOCOrchestrator:
     The create_workflow() method can be replaced with alternative implementations
     (sequential, concurrent, custom, Azure Durable Functions) by modifying this class.
     
-    Uses agent_framework's AzureAIClient (v2 API) for agent-compatible agents.
+    Uses agent_framework's ChatAgent with OpenAIChatClient for agents.
     """
 
     def __init__(
@@ -52,9 +53,8 @@ class SOCOrchestrator:
         self.max_stall_count = max_stall_count
         self.max_reset_count = max_reset_count
         
-        # Store credential and client for agent creation
+        # Store credential for cleanup
         self._credential = None
-        self._ai_client = None
 
         logger.info(
             "SOCOrchestrator initialized",
@@ -62,10 +62,30 @@ class SOCOrchestrator:
             max_rounds=max_round_count,
             max_stalls=max_stall_count,
         )
+    
+    def _load_agent_instructions(self, filename: str) -> str:
+        """
+        Load agent instructions from file.
+        
+        Args:
+            filename: Instruction filename in agent_definitions directory
+            
+        Returns:
+            Instructions as string
+        """
+        instructions_dir = Path(__file__).parent.parent / "deployment" / "agent_definitions"
+        instructions_path = instructions_dir / filename
+        
+        if instructions_path.exists():
+            with open(instructions_path, "r", encoding="utf-8") as f:
+                return f.read()
+        else:
+            logger.warning(f"Instructions file not found: {instructions_path}")
+            return f"You are a {filename.replace('_', ' ').replace('.md', '')} agent."
 
     async def create_workflow(self, agents: Optional[Dict[str, Any]] = None):
         """
-        Create magentic workflow with agent-framework compatible agents.
+        Create magentic workflow with ChatAgent instances.
 
         This is the PLUGIN POINT for orchestration strategy changes.
         To use a different orchestration approach:
@@ -75,7 +95,7 @@ class SOCOrchestrator:
 
         Args:
             agents: Dictionary mapping agent role to agent instances.
-                   If None, discovers agents automatically.
+                   If None, creates agents automatically.
 
         Returns:
             Magentic workflow instance
@@ -92,66 +112,48 @@ class SOCOrchestrator:
             # 2. Define agent execution order
             # 3. Update max_round_count → max_steps
         """
-        logger.info("Creating magentic workflow with AzureAIClient agents")
+        logger.info("Creating magentic workflow with ChatAgent instances")
 
-        # Set environment variable for AzureAIClient
-        os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
-
-        # Agent mapping
-        agent_mapping = {
-            "manager": "soc-manager",
-            "triage": "alert-triage-agent",
-            "hunting": "threat-hunting-agent",
-            "response": "incident-response-agent",
-            "intelligence": "threat-intelligence-agent",
-        }
-
-        # Create async credential
-        self._credential = AzureCliCredential()
+        # Get model deployment name from environment
+        model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4-1-mini")
+        logger.info("Using model for agents", model_id=model_id)
         
-        # Create AzureAIClient with use_latest_version=True to reuse existing agents
-        self._ai_client = AzureAIClient(
-            credential=self._credential,
-            use_latest_version=True  # Reuse existing agents instead of creating new ones
+        # Create Azure credential
+        credential = AzureCliCredential()
+        
+        # Load instructions for agents
+        manager_instructions = self._load_agent_instructions("manager_instructions.md")
+        triage_instructions = self._load_agent_instructions("alert_triage_instructions.md")
+        
+        # Create ChatAgent instances with AzureOpenAIChatClient
+        logger.info("Creating manager agent")
+        manager_agent = ChatAgent(
+            name="soc-manager",
+            description="SOC Manager Agent - Coordinates multi-agent security workflows",
+            instructions=manager_instructions,
+            chat_client=AzureOpenAIChatClient(
+                credential=credential,
+                deployment_name=model_id,
+            ),
         )
         
-        logger.info("Discovering and loading agents from Microsoft Foundry")
+        logger.info("Creating triage agent")
+        triage_agent = ChatAgent(
+            name="alert-triage-agent", 
+            description="Alert Triage Agent - Risk assessment and prioritization",
+            instructions=triage_instructions,
+            chat_client=AzureOpenAIChatClient(
+                credential=credential,
+                deployment_name=model_id,
+            ),
+        )
         
-        # Load manager agent (required for magentic)
-        manager_agent = None
-        try:
-            manager_agent = self._ai_client.create_agent(
-                name=agent_mapping["manager"],
-                instructions="",  # Instructions already defined in Foundry
-            )
-            logger.info("Manager agent loaded", name=agent_mapping["manager"])
-        except Exception as e:
-            logger.error("Failed to load manager agent", error=str(e), exc_info=True)
-            raise ValueError(f"Manager agent not found - required for magentic orchestration: {e}")
-        
-        # Load participant agents
-        participants = {}
-        for role, name in agent_mapping.items():
-            if role == "manager":
-                continue  # Already loaded
-                
-            try:
-                agent = self._ai_client.create_agent(
-                    name=name,
-                    instructions="",  # Instructions already defined in Foundry
-                )
-                participants[role] = agent
-                logger.info("Participant agent loaded", role=role, name=name)
-            except Exception as e:
-                logger.warning(
-                    "Agent not found (optional)",
-                    role=role,
-                    name=name,
-                    error=str(e),
-                )
+        # Build participants dict
+        participants = {
+            "triage": triage_agent,
+        }
 
-        if not participants:
-            logger.warning("No participant agents found - workflow will have limited functionality")
+        logger.info("Participant agents created", count=len(participants))
 
         # =====================================================================
         # PLUGIN POINT: Magentic Orchestration (MVP Strategy)
@@ -198,7 +200,6 @@ class SOCOrchestrator:
         if self._credential:
             await self._credential.close()
             self._credential = None
-        self._ai_client = None
         logger.info("Orchestrator resources cleaned up")
 
     def get_workflow_config(self) -> Dict:
