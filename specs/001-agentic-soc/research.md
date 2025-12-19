@@ -849,7 +849,7 @@ client = AIProjectClient(
 
 # Create a NEW agent (first time)
 agent = client.agents.create(
-    name="AlertTriageAgent",
+    name="AlertTriageAgent",    # Note that names cannot contain underscores '_'
     definition=PromptAgentDefinition(
         model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
         instructions="""
