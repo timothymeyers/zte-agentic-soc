@@ -63,9 +63,8 @@ def test_agent_deployment():
         print(f"✓ Agent deployed successfully!")
         print(f"  - Name: {agent.name}")
         print(f"  - ID: {agent.id}")
-        print(f"  - Model: {agent.model}")
-        if hasattr(agent, 'created_at'):
-            print(f"  - Created: {agent.created_at}")
+        if hasattr(agent, 'description'):
+            print(f"  - Description: {agent.description}")
         
         return True
         

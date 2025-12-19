@@ -89,7 +89,7 @@ class AgentDeployer:
         """
         Deploy a specialized agent to Microsoft Foundry.
         
-        Creates a new agent or updates existing agent with create_version().
+        Creates a new agent or returns existing agent if it already exists.
 
         Args:
             name: Agent name
@@ -105,38 +105,7 @@ class AgentDeployer:
         instructions = self._load_instructions(instructions_file)
 
         try:
-            # Check if agent already exists
-            try:
-                existing_agent = self.get_agent(name)
-                if existing_agent:
-                    logger.info(
-                        "Agent exists, creating new version",
-                        agent_id=existing_agent.id,
-                        name=name,
-                        current_version=existing_agent.version,
-                    )
-                    # Update with new version
-                    agent = self.client.agents.create_version(
-                        agent_name=name,
-                        definition=PromptAgentDefinition(
-                            model=self.model_deployment,
-                            instructions=instructions,
-                        ),
-                        description=description,
-                    )
-                    logger.info(
-                        "Agent version created",
-                        agent_id=agent.id,
-                        name=name,
-                        version=agent.version,
-                        model=self.model_deployment,
-                    )
-                    return agent
-            except Exception:
-                # Agent doesn't exist, create new one
-                pass
-
-            # Create new agent using azure-ai-projects 2.0 API
+            # Try to create new agent using azure-ai-projects 2.0 API
             agent = self.client.agents.create(
                 name=name,
                 definition=PromptAgentDefinition(
@@ -150,13 +119,24 @@ class AgentDeployer:
                 "Agent deployed successfully",
                 agent_id=agent.id,
                 name=name,
-                version=agent.version,
                 model=self.model_deployment,
             )
 
             return agent
 
         except Exception as e:
+            # Check if agent already exists (409 Conflict)
+            if "already exists" in str(e) or "409" in str(e):
+                logger.info("Agent already exists, retrieving existing agent", name=name)
+                existing_agent = self.get_agent(name)
+                if existing_agent:
+                    logger.info(
+                        "Agent retrieved",
+                        agent_id=existing_agent.id,
+                        name=name,
+                    )
+                    return existing_agent
+            
             logger.error(
                 "Failed to deploy agent",
                 name=name,
@@ -198,7 +178,7 @@ class AgentDeployer:
         try:
             # azure-ai-projects 2.0+ has get() method that takes agent_name
             agent = self.client.agents.get(agent_name=name)
-            logger.info("Retrieved agent", name=name, agent_id=agent.id, version=agent.version)
+            logger.info("Retrieved agent", name=name, agent_id=agent.id)
             return agent
 
         except Exception as e:
@@ -236,7 +216,7 @@ class AgentDeployer:
 
 AGENT_DEFINITIONS = {
     "manager": {
-        "name": "SOC_Manager",
+        "name": "soc-manager",
         "instructions_file": "manager_instructions.md",
         "description": "SOC Manager Agent - Coordinates multi-agent security workflows",
     },
