@@ -157,10 +157,6 @@ class SOCOrchestrator:
         if not participants:
             logger.warning("No participant agents found - workflow will have limited functionality")
 
-        # Get OpenAI client for chat completions
-        openai_client = self.client.get_openai_client()
-        chat_client = openai_client.chat.completions
-
         # =====================================================================
         # PLUGIN POINT: Magentic Orchestration (MVP Strategy)
         # =====================================================================
@@ -173,7 +169,7 @@ class SOCOrchestrator:
                 MagenticBuilder()
                 .participants(**participants)  # Specialized agents
                 .with_standard_manager(
-                    chat_client=chat_client,
+                    manager=manager_agent,  # SOC Manager agent
                     max_round_count=self.max_round_count,
                     max_stall_count=self.max_stall_count,
                     max_reset_count=self.max_reset_count,
