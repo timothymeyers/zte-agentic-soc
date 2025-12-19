@@ -110,7 +110,7 @@ def list_agents():
     List all deployed agents in Microsoft Foundry.
 
     Example:
-        ***-soc list-agents
+        asoc list-agents
     """
     console.print("\n[bold blue]📋 Listing Deployed Agents[/bold blue]\n")
 
@@ -163,7 +163,7 @@ def cleanup(
     Delete deployed agents from Microsoft Foundry.
 
     Example:
-        ***-soc cleanup SOC_Manager,AlertTriageAgent
+        asoc cleanup SOC_Manager,AlertTriageAgent
     """
     agent_names = [a.strip() for a in agents.split(",")]
 
