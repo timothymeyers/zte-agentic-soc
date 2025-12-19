@@ -59,7 +59,7 @@ class WorkflowDemo:
             task3 = progress.add_task("Creating magentic workflow...", total=None)
             
             try:
-                self.workflow = create_soc_workflow()
+                self.workflow = await create_soc_workflow()
                 await asyncio.sleep(0.5)
                 progress.update(task3, completed=True)
             except Exception as e:
