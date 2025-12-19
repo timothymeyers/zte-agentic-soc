@@ -4,7 +4,7 @@ Scenario manager for curated demo scenarios.
 Provides pre-configured alert sequences for demonstrating SOC capabilities.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 from uuid import uuid4
@@ -181,7 +181,7 @@ class ScenarioManager:
         2. Successful login from suspicious IP
         3. Lateral movement attempt
         """
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         alerts = []
 
         # Failed login attempts
@@ -261,7 +261,7 @@ class ScenarioManager:
         3. Credential theft detected
         4. Data exfiltration attempt
         """
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         alerts = []
 
         # Suspicious email
@@ -349,7 +349,7 @@ class ScenarioManager:
 
     def _create_ransomware_scenario(self) -> Scenario:
         """Create ransomware attack scenario."""
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         alerts = []
 
         # Malware execution
@@ -421,7 +421,7 @@ class ScenarioManager:
 
     def _create_lateral_movement_scenario(self) -> Scenario:
         """Create lateral movement scenario."""
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         alerts = []
 
         # Initial compromise
@@ -488,7 +488,7 @@ class ScenarioManager:
 
     def _create_mixed_alerts_scenario(self) -> Scenario:
         """Create mixed alerts scenario for testing prioritization."""
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         alerts = []
 
         # Low severity - false positive

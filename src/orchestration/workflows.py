@@ -4,7 +4,7 @@ Workflow execution module for Agentic SOC.
 Handles workflow execution with event streaming and progress tracking.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator, Dict, List, Optional
 from uuid4 import uuid4
 
@@ -56,7 +56,7 @@ class WorkflowExecutor:
             >>> async for event in executor.run_workflow("Analyze this alert"):
             ...     print(event["type"], event["data"])
         """
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc)
 
         logger.info(
             "Starting workflow execution",
@@ -82,7 +82,7 @@ class WorkflowExecutor:
                     yield event_dict
 
             # Workflow complete
-            self.end_time = datetime.utcnow()
+            self.end_time = datetime.now(timezone.utc)
             duration = (self.end_time - self.start_time).total_seconds()
 
             # Get final state and outputs
@@ -107,7 +107,7 @@ class WorkflowExecutor:
             )
 
         except Exception as e:
-            self.end_time = datetime.utcnow()
+            self.end_time = datetime.now(timezone.utc)
             duration = (self.end_time - self.start_time).total_seconds() if self.start_time else 0
 
             logger.error(
@@ -141,7 +141,7 @@ class WorkflowExecutor:
         event_dict = {
             "type": "agent_event",
             "execution_id": self.execution_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_data": {},
         }
 

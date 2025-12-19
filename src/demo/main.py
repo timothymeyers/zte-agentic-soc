@@ -5,7 +5,7 @@ Demonstrates workflow execution with mock data and real-time agent interactions.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from rich.console import Console
@@ -96,13 +96,13 @@ class WorkflowDemo:
         self.console.print("\n[bold]Starting workflow execution...[/bold]\n")
 
         event_count = 0
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         async for event in run_scenario_workflow(self.workflow, scenario_name, scenario.alerts):
             event_count += 1
             self._display_event(event)
 
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         duration = (end_time - start_time).total_seconds()
 
         self.console.print(f"\n[bold green]✓ Scenario complete[/bold green]")

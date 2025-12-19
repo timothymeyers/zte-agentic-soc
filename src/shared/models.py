@@ -145,8 +145,8 @@ class SecurityIncident(BaseModel):
     description: str = Field(alias="Description")
     severity: Severity = Field(alias="Severity")
     status: Status = Field(alias="Status")
-    created_time: datetime = Field(default_factory=datetime.utcnow, alias="CreatedTime")
-    last_modified_time: datetime = Field(default_factory=datetime.utcnow, alias="LastModifiedTime")
+    created_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), alias="CreatedTime")
+    last_modified_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), alias="LastModifiedTime")
     owner: Optional[str] = Field(None, alias="Owner")
     labels: List[str] = Field(default_factory=list, alias="Labels")
     alerts: List[SecurityAlert] = Field(default_factory=list, alias="Alerts")
@@ -169,7 +169,7 @@ class TriageResult(BaseModel):
 
     triage_id: UUID = Field(default_factory=uuid4)
     alert_id: UUID
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     risk_score: int = Field(ge=0, le=100, description="Risk score from 0-100")
     priority: PriorityLevel
     triage_decision: TriageDecision
@@ -202,7 +202,7 @@ class HuntingQuery(BaseModel):
     query_id: UUID = Field(default_factory=uuid4)
     natural_language: str = Field(description="Natural language query from analyst")
     kql_query: str = Field(description="Generated KQL query")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     time_range: str = Field(default="24h")
     expected_results: Optional[str] = Field(None)
     explanation: str = Field(description="Explanation of what the query searches for")
@@ -231,7 +231,7 @@ class ResponseAction(BaseModel):
     incident_id: UUID
     action_type: ResponseActionType
     target_entity: str = Field(description="Entity to act on (IP, hostname, username, etc.)")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: ActionStatus = Field(default=ActionStatus.PENDING)
     risk_level: RiskLevel
     requires_approval: bool = Field(default=True)
@@ -262,7 +262,7 @@ class ThreatBriefing(BaseModel):
     """
 
     briefing_id: UUID = Field(default_factory=uuid4)
-    date: datetime = Field(default_factory=datetime.utcnow)
+    date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     title: str
     summary: str = Field(description="Executive summary of threat landscape")
     key_findings: List[str] = Field(default_factory=list)
@@ -296,7 +296,7 @@ class AgentState(BaseModel):
 
     agent_name: str = Field(description="Name of the agent (e.g., 'AlertTriageAgent')")
     agent_version: str = Field(default="1.0.0")
-    last_execution: datetime = Field(default_factory=datetime.utcnow)
+    last_execution: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     execution_count: int = Field(default=0)
     success_count: int = Field(default=0)
     failure_count: int = Field(default=0)
@@ -324,7 +324,7 @@ class AuditLog(BaseModel):
     """
 
     audit_id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     actor: str = Field(description="Agent or user that performed the action")
     action: str = Field(description="Action performed")
     target: Optional[str] = Field(None, description="Target entity or resource")

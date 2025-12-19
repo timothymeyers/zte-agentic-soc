@@ -7,7 +7,7 @@ Implements configurable alert streaming with checkpoint-based replay functionali
 import asyncio
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator, Dict, Optional
 
@@ -110,7 +110,7 @@ class MockDataStreamer:
         checkpoint = {
             "index": self.current_index,
             "total_streamed": self.total_streamed,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "dataset": self.dataset,
         }
 
