@@ -81,6 +81,15 @@ def setup_logging(
         level=level,
     )
 
+    # Suppress verbose logging from Azure SDK and other libraries
+    # These libraries log HTTP request/response details at DEBUG level
+    logging.getLogger("azure.core").setLevel(logging.WARNING)
+    logging.getLogger("azure.identity").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("aiohttp").setLevel(logging.WARNING)
+
 
 def get_logger(name: str, **initial_context: Any) -> structlog.stdlib.BoundLogger:
     """
