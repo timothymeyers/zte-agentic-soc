@@ -209,3 +209,11 @@ __marimo__/
 .vscode/mcp.json
 mock-data/.DS_Store
 .DS_Store
+
+# Project-specific
+checkpoints/
+.mock_data_checkpoint.json
+*.checkpoint.json
+
+# Azure CLI
+.azure/

@@ -33,35 +33,35 @@
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (Shared Infrastructure) ✅ COMPLETE
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project structure per implementation plan (src/deployment/, src/orchestration/, src/data/, src/shared/, src/demo/, infra/, tests/, docs/, schemas/)
-- [ ] T002 Initialize Python 3.11+ project with pyproject.toml and dependencies (azure-ai-projects, agent-framework, azure-identity, azure-monitor-opentelemetry, pydantic, pandas, fastapi)
-- [ ] T003 [P] Configure linting and formatting tools (black, pylint, mypy) in pyproject.toml
-- [ ] T004 [P] Create .gitignore for Python project (exclude __pycache__, .venv, .env, *.pyc, .pytest_cache, .mypy_cache, checkpoints/)
-- [ ] T005 [P] Setup GitHub Actions CI/CD workflow skeleton in .github/workflows/ci.yml
-- [ ] T006 Create README.md with project overview and setup instructions
-- [ ] T007 Create environment variable template file .env.example with required variables (PROJECT_CONNECTION_STRING, AZURE_AI_MODEL_DEPLOYMENT_NAME, etc.)
+- [X] T001 Create project structure per implementation plan (src/deployment/, src/orchestration/, src/data/, src/shared/, src/demo/, infra/, tests/, docs/, schemas/)
+- [X] T002 Initialize Python 3.11+ project with pyproject.toml and dependencies (azure-ai-projects, agent-framework, azure-identity, azure-monitor-opentelemetry, pydantic, pandas, fastapi)
+- [X] T003 [P] Configure linting and formatting tools (black, pylint, mypy) in pyproject.toml
+- [X] T004 [P] Create .gitignore for Python project (exclude __pycache__, .venv, .env, *.pyc, .pytest_cache, .mypy_cache, checkpoints/)
+- [X] T005 [P] Setup GitHub Actions CI/CD workflow skeleton in .github/workflows/ci.yml
+- [X] T006 Create README.md with project overview and setup instructions
+- [X] T007 Create environment variable template file .env.example with required variables (PROJECT_CONNECTION_STRING, AZURE_AI_MODEL_DEPLOYMENT_NAME, etc.)
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 2: Foundational (Blocking Prerequisites) ✅ COMPLETE
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Create Pydantic data models in src/shared/models.py (SecurityAlert, SecurityIncident, TriageResult, HuntingQuery, ResponseAction, ThreatBriefing, AgentState, AuditLog) from data-model.md
-- [ ] T009 [P] Implement authentication module in src/shared/auth.py (Managed Identity with DefaultAzureCredential, fallback to service principal if needed)
-- [ ] T010 [P] Implement structured logging in src/shared/logging.py (structlog with JSON formatting, OpenTelemetry integration)
-- [ ] T011 [P] Create mock data loader in src/data/datasets.py (load GUIDE and Attack datasets from mock-data/ directory, transform to Sentinel format)
-- [ ] T012 [P] Implement mock data streamer in src/data/streaming.py (MockDataStreamer class with configurable interval, checkpoint-based replay, async generator pattern)
-- [ ] T013 [P] Create scenario manager in src/data/scenarios.py (ScenarioManager with curated scenarios: brute_force, phishing_campaign, ransomware)
-- [ ] T014 Setup Bicep infrastructure templates skeleton in infra/main.bicep (modules for microsoft-foundry.bicep, cosmos.bicep, monitoring.bicep)
+- [X] T008 Create Pydantic data models in src/shared/models.py (SecurityAlert, SecurityIncident, TriageResult, HuntingQuery, ResponseAction, ThreatBriefing, AgentState, AuditLog) from data-model.md
+- [X] T009 [P] Implement authentication module in src/shared/auth.py (Managed Identity with DefaultAzureCredential, fallback to service principal if needed)
+- [X] T010 [P] Implement structured logging in src/shared/logging.py (structlog with JSON formatting, OpenTelemetry integration)
+- [X] T011 [P] Create mock data loader in src/data/datasets.py (load GUIDE and Attack datasets from mock-data/ directory, transform to Sentinel format)
+- [X] T012 [P] Implement mock data streamer in src/data/streaming.py (MockDataStreamer class with configurable interval, checkpoint-based replay, async generator pattern)
+- [X] T013 [P] Create scenario manager in src/data/scenarios.py (ScenarioManager with curated scenarios: brute_force, phishing_campaign, ransomware)
+- [X] T014 Setup Bicep infrastructure templates skeleton in infra/main.bicep (modules for microsoft-foundry.bicep, cosmos.bicep, monitoring.bicep)
 
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+**Checkpoint**: Foundation ready - user story implementation can now begin in parallel ✅
 
 ---
 
@@ -73,20 +73,20 @@
 
 **MVP Note**: Uses magentic orchestration for MVP. A research task (T095) will evaluate alternative orchestration approaches for production.
 
-### Phase A: Infrastructure Deployment (US5)
+### Phase A: Infrastructure Deployment (US5) ✅ COMPLETE
 
-- [ ] T015 [P] [US5] Create Manager Agent instructions in src/deployment/agent_definitions/manager_instructions.md (coordination rules, enforces triage-first behavior, agent selection criteria, plan creation format)
-- [ ] T016 [US5] Implement agent deployment script in src/deployment/deploy_agents.py (uses azure-ai-projects SDK, creates v2 agents with AIProjectClient.agents.create_version(), deploys manager agent only for this phase)
-- [ ] T017 [US5] Create CLI command in src/demo/cli.py for deploying agents (python -m src.demo.cli deploy)
+- [X] T015 [P] [US5] Create Manager Agent instructions in src/deployment/agent_definitions/manager_instructions.md (coordination rules, enforces triage-first behavior, agent selection criteria, plan creation format)
+- [X] T016 [US5] Implement agent deployment script in src/deployment/deploy_agents.py (uses azure-ai-projects SDK, creates v2 agents with AIProjectClient.agents.create_version(), deploys manager agent only for this phase)
+- [X] T017 [US5] Create CLI command in src/demo/cli.py for deploying agents (python -m src.demo.cli deploy)
 
-### Phase B: Runtime Orchestration (US5)
+### Phase B: Runtime Orchestration (US5) ✅ COMPLETE
 
-- [ ] T018 [US5] Implement magentic orchestrator setup in src/orchestration/orchestrator.py (create_workflow() function with MagenticBuilder, plugin point clearly documented, manager agent discovery)
-- [ ] T019 [P] [US5] Implement workflow execution module in src/orchestration/workflows.py (run_workflow() function with event streaming, AgentRunUpdateEvent handling, progress tracking)
-- [ ] T020 [US5] Create demo main script in src/demo/main.py (initializes workflow, loads mock data, streams events, displays agent interactions)
-- [ ] T021 [US5] Add CLI commands for running workflows in src/demo/cli.py (python -m src.demo.cli run-workflow <scenario_name>)
+- [X] T018 [US5] Implement magentic orchestrator setup in src/orchestration/orchestrator.py (create_workflow() function with MagenticBuilder, plugin point clearly documented, manager agent discovery)
+- [X] T019 [P] [US5] Implement workflow execution module in src/orchestration/workflows.py (run_workflow() function with event streaming, AgentRunUpdateEvent handling, progress tracking)
+- [X] T020 [US5] Create demo main script in src/demo/main.py (initializes workflow, loads mock data, streams events, displays agent interactions)
+- [X] T021 [US5] Add CLI commands for running workflows in src/demo/cli.py (python -m src.demo.cli run-workflow <scenario_name>)
 
-**Checkpoint**: At this point, orchestration infrastructure should be operational. Manager agent deployed, magentic workflow can be initialized and run (though without other agents yet).
+**Checkpoint**: Orchestration infrastructure operational ✅ Manager agent deployed, magentic workflow can be initialized and run (though without other agents yet).
 
 ---
 

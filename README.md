@@ -83,7 +83,137 @@ All development follows the constitutional framework with emphasis on:
 
 ## Getting Started
 
-*Documentation for setup and deployment will be added as the MVP is implemented.*
+### Prerequisites
+
+- **Python**: 3.11 or higher
+- **Azure CLI**: Installed and authenticated
+- **Azure Access**: RBAC access to an Azure resource group (e.g., `asoc-zte-rg`)
+- **Microsoft Foundry**: Access to Microsoft Foundry workspace and project
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/timothymeyers/zte-agentic-soc.git
+   cd zte-agentic-soc
+   ```
+
+2. **Set up Python environment**:
+   ```bash
+   # Create virtual environment
+   python3.11 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   
+   # Install dependencies (including pre-release azure-ai-projects)
+   pip install --upgrade pip
+   pip install -e ".[dev]"
+   ```
+
+3. **Configure environment variables**:
+   ```bash
+   # Copy template and edit with your values
+   cp .env.example .env
+   
+   # Edit .env with your Azure credentials and endpoints
+   # Required variables:
+   # - AZURE_TENANT_ID
+   # - AZURE_SUBSCRIPTION_ID
+   # - AZURE_RESOURCE_GROUP
+   # - AZURE_AI_FOUNDRY_PROJECT_ENDPOINT
+   # - AZURE_OPENAI_DEPLOYMENT_NAME (or AZURE_AI_MODEL_DEPLOYMENT_NAME)
+   ```
+
+4. **Verify Azure authentication**:
+   ```bash
+   # Login to Azure CLI (if not already logged in)
+   az login
+   
+   # Verify access to resource group
+   az group show --name asoc-zte-rg
+   ```
+
+5. **Verify agent deployment**:
+   ```bash
+   # Run the agent API test
+   python test_agent_api.py
+   
+   # Expected: All tests pass, agent created successfully
+   ```
+
+6. **Run linting and tests** (optional):
+   ```bash
+   # Format code
+   black src/
+   
+   # Run linters
+   ruff check src/
+   pylint src/
+   
+   # Run type checking
+   mypy src/
+   ```
+
+### Development Workflow
+
+1. **Project Structure**:
+   ```
+   src/
+   ├── deployment/        # Agent deployment scripts
+   ├── orchestration/     # Agent coordination and workflows
+   ├── data/             # Mock data processing
+   ├── shared/           # Shared utilities (auth, logging, models)
+   └── demo/             # Demo scenarios and CLI
+   ```
+
+2. **Key Configuration Files**:
+   - `pyproject.toml` - Python project configuration and dependencies
+   - `.env` - Environment variables (not committed)
+   - `.env.example` - Environment variable template
+
+3. **Agent Deployment & Demo**:
+   ```bash
+   # Verify agent API is working
+   python test_agent_api.py
+   
+   # Deploy agents to Microsoft Foundry (Phase 3+)
+   asoc deploy
+   
+   # List deployed agents
+   asoc list-agents
+   
+   # Run a demo scenario (Phase 4+)
+   asoc run-workflow brute_force
+   asoc stream-alerts --limit 5
+   ```
+
+### Architecture Overview
+
+The Agentic SOC uses a **two-phase architecture**:
+
+**Phase A: Infrastructure Deployment**
+- Deploy AI agents to Microsoft Foundry using `azure-ai-projects>=2.0.0b1` SDK
+- Uses `AIProjectClient` with `create_version()` for agent creation/updates
+- Retrieves agents with `get(agent_name=...)` for orchestration
+- Agents are cloud-hosted and persistent with versioning support
+
+**Phase B: Runtime Orchestration**
+- Use Microsoft Agent Framework's magentic orchestrator for coordination
+- Manager agent selects appropriate specialized agents dynamically
+- Context shared between agents via Sentinel incidents and Cosmos DB
+- Agent interaction through OpenAI client with agent references
+
+### MVP Implementation Status
+
+- [x] **Phase 1: Setup** - Project structure, dependencies, configuration
+- [x] **Phase 2: Foundational** - Pydantic models, auth, logging, mock data
+- [x] **Phase 3: Orchestration** - Manager agent, magentic workflow, agent deployment
+  - ✅ Agent deployment with azure-ai-projects 2.0.0b1+
+  - ✅ SOCOrchestrator with magentic coordination
+  - ✅ CLI commands for deployment and workflows
+  - ✅ Verified working with test_agent_api.py
+- [ ] **Phase 4: Alert Triage Agent** (P1 - first specialized agent)
+- [ ] **Phase 5-7: Additional agents** (Intelligence, Hunting, Response)
+- [ ] **Phase 8+: Integration, infrastructure, polish**
 
 ## License
 
