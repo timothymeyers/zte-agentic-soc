@@ -98,15 +98,15 @@
 
 ### Phase A: Infrastructure Deployment (US1)
 
-- [ ] T022 [P] [US1] Create Alert Triage Agent instructions in src/deployment/agent_definitions/alert_triage_instructions.md (comprehensive system prompt following Section 11 of research.md: role definition, risk scoring factors, correlation logic, output format with examples)
-- [ ] T023 [US1] Update deployment script in src/deployment/deploy_agents.py to deploy Alert Triage Agent (add to agent_definitions dict, call create_version())
-- [ ] T024 [US1] Create input/output JSON schemas in schemas/alert-triage-input.schema.json and schemas/alert-triage-output.schema.json (SecurityAlert input, TriageResult output)
+- [X] T022 [P] [US1] Create Alert Triage Agent instructions in src/deployment/agent_definitions/alert_triage_instructions.md (comprehensive system prompt following Section 11 of research.md: role definition, risk scoring factors, correlation logic, output format with examples)
+- [X] T023 [US1] Update deployment script in src/deployment/deploy_agents.py to deploy Alert Triage Agent (add to agent_definitions dict, call create_version())
+- [X] T024 [US1] Create input/output JSON schemas in schemas/alert-triage-input.schema.json and schemas/alert-triage-output.schema.json (SecurityAlert input, TriageResult output)
 
 ### Phase B: Runtime Integration (US1)
 
-- [ ] T025 [US1] Update magentic orchestrator in src/orchestration/orchestrator.py to include triage agent in participants (discover via AIProjectClient.agents.get_agent())
-- [ ] T026 [US1] Create alert triage scenario in src/demo/scenarios/scenario_01_alert_triage.py (load mixed alert batch, run through triage agent, display results)
-- [ ] T027 [US1] Update manager agent instructions in src/deployment/agent_definitions/manager_instructions.md to reference triage agent (add "triage" to team list, document triage-first rule)
+- [X] T025 [US1] Update magentic orchestrator in src/orchestration/orchestrator.py to include triage agent in participants (discover via AIProjectClient.agents.get_agent())
+- [X] T026 [US1] Create alert triage scenario in src/demo/scenarios/scenario_01_alert_triage.py (load mixed alert batch, run through triage agent, display results)
+- [X] T027 [US1] Update manager agent instructions in src/deployment/agent_definitions/manager_instructions.md to reference triage agent (add "triage" to team list, document triage-first rule)
 
 **Checkpoint**: Alert Triage Agent should be fully functional and testable independently. Can ingest alerts and produce prioritized triage results with risk scores and explanations.
 
