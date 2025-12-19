@@ -4,10 +4,9 @@ Workflow execution module for Agentic SOC.
 Handles workflow execution with event streaming and progress tracking.
 """
 
-import asyncio
 from datetime import datetime
 from typing import AsyncIterator, Dict, List, Optional
-from uuid import uuid4
+from uuid4 import uuid4
 
 from agent_framework import AgentRunUpdateEvent
 
