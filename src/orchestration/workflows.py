@@ -6,7 +6,7 @@ Handles workflow execution with event streaming and progress tracking.
 
 from datetime import datetime, timezone
 from typing import AsyncIterator, Dict, List, Optional
-from uuid4 import uuid4
+from uuid import uuid4
 
 from agent_framework import AgentRunUpdateEvent
 
