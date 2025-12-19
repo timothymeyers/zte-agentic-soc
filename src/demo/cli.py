@@ -85,14 +85,14 @@ def deploy(
         table.add_column("Agent", style="cyan")
         table.add_column("Name", style="green")
         table.add_column("ID", style="yellow")
-        table.add_column("Model", style="blue")
+        table.add_column("Type", style="blue")
 
         for key, agent in deployed.items():
             table.add_row(
                 key.upper(),
                 agent.name,
                 agent.id[:16] + "...",
-                agent.model,
+                "PromptAgent",
             )
 
         console.print(table)
@@ -126,15 +126,13 @@ def list_agents():
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Name", style="cyan")
         table.add_column("ID", style="yellow")
-        table.add_column("Model", style="green")
-        table.add_column("Description", style="blue")
+        table.add_column("Type", style="green")
 
         for agent in agents:
             table.add_row(
                 agent.name,
                 agent.id[:16] + "...",
-                agent.model,
-                agent.description[:50] + "..." if len(agent.description) > 50 else agent.description,
+                "PromptAgent",
             )
 
         console.print(table)
