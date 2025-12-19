@@ -50,10 +50,10 @@ class WorkflowDemo:
             TextColumn("[progress.description]{task.description}"),
             console=self.console,
         ) as progress:
-            task1 = progress.add_task("Connecting to Microsoft Foundry...", total=None)
+            progress.add_task("Connecting to Microsoft Foundry...", total=None)
             await asyncio.sleep(0.5)  # Simulated delay
 
-            task2 = progress.add_task("Discovering deployed agents...", total=None)
+            progress.add_task("Discovering deployed agents...", total=None)
             await asyncio.sleep(0.5)
 
             task3 = progress.add_task("Creating magentic workflow...", total=None)

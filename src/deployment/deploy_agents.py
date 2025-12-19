@@ -5,12 +5,11 @@ Deploys AI agents to Microsoft Foundry using azure-ai-projects SDK.
 """
 
 import asyncio
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from azure.ai.agents import AgentsClient
-from azure.core.exceptions import ResourceNotFoundError
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
 
 from src.shared.auth import get_project_credential, get_project_endpoint, get_openai_deployment
 from src.shared.logging import get_logger
@@ -21,6 +20,8 @@ logger = get_logger(__name__, module="deployment")
 class AgentDeployer:
     """
     Deploy and manage AI agents in Microsoft Foundry.
+    
+    Uses azure-ai-projects SDK (2.0.0b1+) with AIProjectClient for agent management.
     """
 
     def __init__(self, project_endpoint: Optional[str] = None, model_deployment: Optional[str] = None):
@@ -31,14 +32,15 @@ class AgentDeployer:
             project_endpoint: Microsoft Foundry project endpoint.
                             Defaults to AZURE_AI_FOUNDRY_PROJECT_ENDPOINT env var.
             model_deployment: OpenAI model deployment name.
-                            Defaults to AZURE_OPENAI_DEPLOYMENT_NAME env var.
+                            Defaults to AZURE_OPENAI_DEPLOYMENT_NAME or
+                            AZURE_AI_MODEL_DEPLOYMENT_NAME env var.
         """
         self.project_endpoint = project_endpoint or get_project_endpoint()
         self.model_deployment = model_deployment or get_openai_deployment()
         self.credential = get_project_credential()
 
-        # Initialize AgentsClient
-        self.client = AgentsClient(
+        # Initialize AIProjectClient (azure-ai-projects 2.0.0b1+)
+        self.client = AIProjectClient(
             endpoint=self.project_endpoint,
             credential=self.credential
         )
@@ -86,6 +88,8 @@ class AgentDeployer:
     ) -> Any:
         """
         Deploy a specialized agent to Microsoft Foundry.
+        
+        Creates a new agent or updates existing agent with create_version().
 
         Args:
             name: Agent name
@@ -101,25 +105,44 @@ class AgentDeployer:
         instructions = self._load_instructions(instructions_file)
 
         try:
-            # Check if agent already exists by listing and filtering by name
+            # Check if agent already exists
             try:
                 existing_agent = self.get_agent(name)
                 if existing_agent:
                     logger.info(
-                        "Agent already exists",
+                        "Agent exists, creating new version",
                         agent_id=existing_agent.id,
                         name=name,
+                        current_version=existing_agent.version,
                     )
-                    return existing_agent
+                    # Update with new version
+                    agent = self.client.agents.create_version(
+                        agent_name=name,
+                        definition=PromptAgentDefinition(
+                            model=self.model_deployment,
+                            instructions=instructions,
+                        ),
+                        description=description,
+                    )
+                    logger.info(
+                        "Agent version created",
+                        agent_id=agent.id,
+                        name=name,
+                        version=agent.version,
+                        model=self.model_deployment,
+                    )
+                    return agent
             except Exception:
-                # Continue to create new agent
+                # Agent doesn't exist, create new one
                 pass
 
-            # Create new agent using azure-ai-agents API
-            agent = self.client.create_agent(
-                model=self.model_deployment,
+            # Create new agent using azure-ai-projects 2.0 API
+            agent = self.client.agents.create(
                 name=name,
-                instructions=instructions,
+                definition=PromptAgentDefinition(
+                    model=self.model_deployment,
+                    instructions=instructions,
+                ),
                 description=description,
             )
 
@@ -127,6 +150,7 @@ class AgentDeployer:
                 "Agent deployed successfully",
                 agent_id=agent.id,
                 name=name,
+                version=agent.version,
                 model=self.model_deployment,
             )
 
@@ -149,7 +173,7 @@ class AgentDeployer:
             List of agent objects
         """
         try:
-            agents = self.client.list_agents()
+            agents = self.client.agents.list()
             agent_list = list(agents)
 
             logger.info("Listed agents", count=len(agent_list))
@@ -162,6 +186,8 @@ class AgentDeployer:
     def get_agent(self, name: str) -> Optional[Any]:
         """
         Get a deployed agent by name.
+        
+        Uses client.agents.get(agent_name=...) from azure-ai-projects 2.0.
 
         Args:
             name: Agent name
@@ -170,19 +196,15 @@ class AgentDeployer:
             Agent object or None if not found
         """
         try:
-            # azure-ai-agents SDK doesn't have get_by_name, so list and filter
-            agents = self.client.list_agents()
-            for agent in agents:
-                if agent.name == name:
-                    logger.info("Retrieved agent", name=name, agent_id=agent.id)
-                    return agent
-
-            logger.warning("Agent not found", name=name)
-            return None
+            # azure-ai-projects 2.0+ has get() method that takes agent_name
+            agent = self.client.agents.get(agent_name=name)
+            logger.info("Retrieved agent", name=name, agent_id=agent.id, version=agent.version)
+            return agent
 
         except Exception as e:
-            logger.error("Failed to get agent", name=name, error=str(e), exc_info=True)
-            raise
+            # Agent not found or other error
+            logger.warning("Agent not found or error retrieving", name=name, error=str(e))
+            return None
 
     def delete_agent(self, name: str) -> bool:
         """
@@ -199,7 +221,7 @@ class AgentDeployer:
             if not agent:
                 return False
 
-            self.client.delete_agent(agent.id)
+            self.client.agents.delete(agent_name=name)
             logger.info("Agent deleted", name=name, agent_id=agent.id)
             return True
 

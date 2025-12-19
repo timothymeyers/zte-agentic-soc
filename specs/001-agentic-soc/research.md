@@ -819,43 +819,40 @@ async def create_triage_agent_with_knowledge():
 
 **Implementation Approach**:
 
-**IMPORTANT - Correct SDK Usage (azure-ai-agents 1.1.0 + azure-ai-projects 1.0.0b3)**:
+**IMPORTANT - Correct SDK Usage (azure-ai-projects >=2.0.0b1)**:
 
-**Recommended Approach**: Use `AgentsClient` directly from `azure-ai-agents` package.
+**✅ VERIFIED APPROACH (December 2025)**: Use `AIProjectClient` from `azure-ai-projects>=2.0.0b1` package.
 
 **Correct imports**:
 ```python
-from azure.ai.agents import AgentsClient  # Recommended: Direct usage
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition  # For defining agent configuration
 from azure.identity import DefaultAzureCredential
 from typing import Any  # Use Any for agent type hints
-
-# Alternative (also works):
-# from azure.ai.projects import AIProjectClient
-# client = AIProjectClient.from_connection_string(...).agents  # Returns AgentsClient
 ```
 
-**Agent objects**: Agents returned by the SDK are dictionary-like objects (compatible with MutableMapping), not a specific `Agent` class.
+**Agent objects**: Agents returned by the SDK include `AgentObject` (from `get()` and `list()`) and `AgentVersionObject` (from `create_version()`). Both are compatible with MutableMapping.
 
-1. **Agent Creation with `AgentsClient`**:
+1. **Agent Creation and Update with `AIProjectClient.agents`**:
 
 ```python
-from azure.ai.agents import AgentsClient
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
 import os
 
-# Connect to Microsoft Foundry workspace
-# Use AgentsClient directly for agent management
-client = AgentsClient(
+# Connect to Microsoft Foundry project
+client = AIProjectClient(
     endpoint=os.environ["AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"],
     credential=DefaultAzureCredential()
 )
 
-# Create an agent using azure-ai-agents 1.1.0 SDK
-# Returns agent object (dictionary-like), not a specific Agent class
-agent = client.create_agent(
-    model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+# Create a NEW agent (first time)
+agent = client.agents.create(
     name="AlertTriageAgent",
-    instructions="""
+    definition=PromptAgentDefinition(
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+        instructions="""
 You are an expert SOC analyst specializing in alert triage and risk assessment.
 
 Your role is to analyze security alerts and provide:
@@ -866,38 +863,41 @@ Your role is to analyze security alerts and provide:
 
 Input format: You will receive security alerts in JSON format.
 Output format: Provide structured JSON with riskLevel, explanation, relatedAlerts, and nextSteps.
-    """,
-    description="Alert triage and risk assessment agent",
-    metadata={
-        "agent_type": "triage",
-        "priority": "P1"
-    }
+        """,
+    ),
+    description="Alert triage and risk assessment agent"
 )
 
-print(f"Agent created: {agent.name} (id: {agent.id})")
+print(f"Agent created: {agent.name} (id: {agent.id}, version: {agent.version})")
+
+# UPDATE an existing agent (creates new version)
+updated_agent = client.agents.create_version(
+    agent_name="AlertTriageAgent",
+    definition=PromptAgentDefinition(
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+        instructions="Updated instructions here...",
+    ),
+    description="Updated alert triage agent"
+)
+
+print(f"Agent updated: {updated_agent.name} (version: {updated_agent.version})")
 ```
 
 2. **Agent Discovery and Listing Patterns**:
 
 ```python
-# List all agents in the workspace
-agents = client.list_agents()
+# List all agents in the project
+agents = list(client.agents.list())
 for agent in agents:
-    print(f"Agent: {agent.name} - {agent.description}")
+    print(f"Agent: {agent.name}")
 
-# Get a specific agent by name (must list and filter)
-# Note: get_agent() takes agent_id, not agent_name
-all_agents = list(client.list_agents())
-triage_agent = next((a for a in all_agents if a.name == "AlertTriageAgent"), None)
-if triage_agent:
-    print(f"Retrieved agent: {triage_agent.name} (id: {triage_agent.id})")
+# Get a specific agent by name (azure-ai-projects 2.0+)
+# ✅ CORRECT: get() method accepts agent_name parameter
+agent = client.agents.get(agent_name="AlertTriageAgent")
+print(f"Retrieved agent: {agent.name} (id: {agent.id})")
 
-# Get agent by ID (if you already have the ID)
-agent_by_id = client.get_agent(agent_id="asst_12345...")
-print(f"Agent: {agent_by_id.name}")
-
-# Delete agent by ID
-client.delete_agent(agent_id="asst_12345...")
+# Delete agent by name
+client.agents.delete(agent_name="AlertTriageAgent")
 print("Agent deleted")
 ```
 
@@ -905,16 +905,17 @@ print("Agent deleted")
 
 **Phase A: Infrastructure Deployment (One-time)**
 ```python
-# deploy_agents.py - Run once to create persistent agents
+# deploy_agents.py - Run once to create/update persistent agents
 from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
+import os
 
 def deploy_all_agents():
     """Deploy all SOC agents to Microsoft Foundry"""
     
-    # Note: AIProjectClient.agents provides access to AgentsClient from azure-ai-agents package
-    project_client = AIProjectClient.from_connection_string(
-        conn_str=os.environ["PROJECT_CONNECTION_STRING"],
+    client = AIProjectClient(
+        endpoint=os.environ["AZURE_AI_FOUNDRY_PROJECT_ENDPOINT"],
         credential=DefaultAzureCredential()
     )
     
@@ -928,17 +929,35 @@ def deploy_all_agents():
     }
     
     deployed_agents = {}
+    model = os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"]
+    
     for agent_name, instructions in agent_definitions.items():
-        # Use create_agent() method from azure-ai-agents SDK
-        # Note: Returns agent object (dictionary-like), not a specific Agent class
-        agent = project_client.agents.create_agent(
-            model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-            name=agent_name,
-            instructions=instructions,
-            description=f"{agent_name} for Agentic SOC MVP"
-        )
+        # Check if agent exists
+        try:
+            existing = client.agents.get(agent_name=agent_name)
+            # Agent exists, create new version
+            agent = client.agents.create_version(
+                agent_name=agent_name,
+                definition=PromptAgentDefinition(
+                    model=model,
+                    instructions=instructions,
+                ),
+                description=f"{agent_name} for Agentic SOC MVP"
+            )
+            print(f"✓ Updated: {agent_name} (version: {agent.version})")
+        except:
+            # Agent doesn't exist, create new one
+            agent = client.agents.create(
+                name=agent_name,
+                definition=PromptAgentDefinition(
+                    model=model,
+                    instructions=instructions,
+                ),
+                description=f"{agent_name} for Agentic SOC MVP"
+            )
+            print(f"✓ Created: {agent_name} (version: {agent.version})")
+        
         deployed_agents[agent_name] = agent
-        print(f"✓ Deployed: {agent_name} (id: {agent.id})")
     
     return deployed_agents
 
@@ -947,12 +966,18 @@ if __name__ == "__main__":
     deploy_all_agents()
 ```
 
-**Important SDK Notes**:
-- `AIProjectClient.agents` provides an authenticated `AgentsClient` from `azure-ai-agents` package
-- Agent objects are dictionary-like (compatible with MutableMapping), not a specific `Agent` class to import
-- Do NOT import `from azure.ai.projects.models import Agent` - this does not exist
-- Methods: `create_agent()`, `list_agents()`, `get_agent(agent_id)`, `delete_agent(agent_id)`
-- There is no `get_agent(agent_name=...)` - use `list_agents()` and filter by `agent.name` instead
+**Important SDK Notes (azure-ai-projects 2.0.0b1+)**:
+- **Package**: `azure-ai-projects>=2.0.0b1` (NOT azure-ai-agents)
+- **Client**: Use `AIProjectClient` with project endpoint
+- **Methods on `client.agents`**:
+  - `create(name, definition, description)` - Create new agent
+  - `create_version(agent_name, definition, description)` - Update/create version
+  - `get(agent_name)` - Retrieve agent by name ✅ This works!
+  - `list()` - List all agents
+  - `delete(agent_name)` - Delete agent by name
+- **Agent Definition**: Use `PromptAgentDefinition(model, instructions)` for prompt agents
+- **Returns**: `AgentObject` (get/list) or `AgentVersionObject` (create_version)
+- **Example from user**: See their working code snippet with `get(agent_name=...)`
 
 **Phase B: Runtime Orchestration (Demonstration)**
 ```python

@@ -21,7 +21,7 @@ from src.deployment.deploy_agents import (
 from src.shared.logging import get_logger
 
 app = typer.Typer(
-    name="***-soc",
+    name="asoc",
     help="Agentic SOC - AI-powered Security Operations Center",
     add_completion=False,
 )
@@ -55,13 +55,13 @@ def deploy(
 
     Examples:
         # Deploy only manager agent
-        ***-soc deploy --agents manager
+        asoc deploy --agents manager
 
         # Deploy multiple agents
-        ***-soc deploy --agents manager,triage
+        asoc deploy --agents manager,triage
 
         # Deploy all agents
-        ***-soc deploy
+        asoc deploy
     """
     console.print("\n[bold blue]🚀 Deploying Agents to Microsoft Foundry[/bold blue]\n")
 
@@ -88,7 +88,7 @@ def deploy(
         table.add_column("Model", style="blue")
 
         for key, agent in deployed.items():
-            table.add_column(
+            table.add_row(
                 key.upper(),
                 agent.name,
                 agent.id[:16] + "...",

@@ -4,11 +4,10 @@ Magentic orchestrator setup for Agentic SOC.
 Implements magentic workflow creation with clear plugin point for alternative strategies.
 """
 
-import os
 from typing import Any, Dict, Optional
 
 from agent_framework import MagenticBuilder
-from azure.ai.agents import AgentsClient
+from azure.ai.projects import AIProjectClient
 
 from src.shared.auth import get_project_credential, get_project_endpoint
 from src.shared.logging import get_logger
@@ -23,6 +22,8 @@ class SOCOrchestrator:
     This class provides a clear plugin point for changing orchestration strategies.
     The create_workflow() method can be replaced with alternative implementations
     (sequential, concurrent, custom, Azure Durable Functions) by modifying this class.
+    
+    Uses azure-ai-projects SDK (2.0.0b1+) with AIProjectClient for agent management.
     """
 
     def __init__(
@@ -49,8 +50,8 @@ class SOCOrchestrator:
         self.max_stall_count = max_stall_count
         self.max_reset_count = max_reset_count
 
-        # Initialize AgentsClient
-        self.client = AgentsClient(
+        # Initialize AIProjectClient (azure-ai-projects 2.0.0b1+)
+        self.client = AIProjectClient(
             endpoint=self.project_endpoint,
             credential=self.credential
         )
@@ -65,6 +66,8 @@ class SOCOrchestrator:
     def discover_agents(self) -> Dict[str, Any]:
         """
         Discover deployed agents in Microsoft Foundry.
+        
+        Uses client.agents.get(agent_name=...) from azure-ai-projects 2.0.
 
         Returns:
             Dictionary mapping agent role to agent object
@@ -83,25 +86,15 @@ class SOCOrchestrator:
             "intelligence": "ThreatIntelligenceAgent",
         }
 
-        # List all agents once and filter by name
-        try:
-            all_agents = list(self.client.list_agents())
-        except Exception as e:
-            logger.error("Failed to list agents", error=str(e))
-            all_agents = []
-
         for role, name in agent_mapping.items():
             try:
-                # Find agent by name
-                agent = next((a for a in all_agents if a.name == name), None)
-                if agent:
-                    agents[role] = agent
-                    logger.info("Agent discovered", role=role, name=name, agent_id=agent.id)
-                else:
-                    logger.warning("Agent not found", role=role, name=name)
+                # Use get() method with agent_name parameter (azure-ai-projects 2.0+)
+                agent = self.client.agents.get(agent_name=name)
+                agents[role] = agent
+                logger.info("Agent discovered", role=role, name=name, agent_id=agent.id, version=agent.version)
             except Exception as e:
                 logger.warning(
-                    "Agent discovery error",
+                    "Agent not found or error",
                     role=role,
                     name=name,
                     error=str(e),
@@ -164,8 +157,9 @@ class SOCOrchestrator:
         if not participants:
             logger.warning("No participant agents found - workflow will have limited functionality")
 
-        # Get chat client for manager
-        chat_client = self.client.inference.get_chat_completions_client()
+        # Get OpenAI client for chat completions
+        openai_client = self.client.get_openai_client()
+        chat_client = openai_client.chat.completions
 
         # =====================================================================
         # PLUGIN POINT: Magentic Orchestration (MVP Strategy)
