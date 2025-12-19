@@ -89,7 +89,7 @@ class AgentDeployer:
         """
         Deploy a specialized agent to Microsoft Foundry.
         
-        Creates a new agent or returns existing agent if it already exists.
+        Creates a new agent or creates a new version if agent already exists.
 
         Args:
             name: Agent name
@@ -97,7 +97,7 @@ class AgentDeployer:
             description: Agent description
 
         Returns:
-            Deployed agent object (AgentObject from azure.ai.projects)
+            Deployed agent object (AgentVersionObject from create_version or AgentObject from create)
         """
         logger.info("Deploying agent", name=name, instructions_file=instructions_file)
 
@@ -127,15 +127,34 @@ class AgentDeployer:
         except Exception as e:
             # Check if agent already exists (409 Conflict)
             if "already exists" in str(e) or "409" in str(e):
-                logger.info("Agent already exists, retrieving existing agent", name=name)
+                logger.info("Agent already exists, creating new version", name=name)
                 existing_agent = self.get_agent(name)
                 if existing_agent:
-                    logger.info(
-                        "Agent retrieved",
-                        agent_id=existing_agent.id,
-                        name=name,
-                    )
-                    return existing_agent
+                    try:
+                        # Create a new version of the existing agent
+                        agent_version = self.client.agents.create_version(
+                            agent_name=name,
+                            definition=PromptAgentDefinition(
+                                model=self.model_deployment,
+                                instructions=instructions,
+                            ),
+                            description=description,
+                        )
+                        logger.info(
+                            "Agent version created successfully",
+                            agent_id=existing_agent.id,
+                            name=name,
+                            version=getattr(agent_version, 'version', 'unknown'),
+                        )
+                        return agent_version
+                    except Exception as version_error:
+                        logger.error(
+                            "Failed to create agent version",
+                            name=name,
+                            error=str(version_error),
+                            exc_info=True,
+                        )
+                        raise
             
             logger.error(
                 "Failed to deploy agent",
