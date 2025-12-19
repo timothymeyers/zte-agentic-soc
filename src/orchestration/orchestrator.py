@@ -79,11 +79,11 @@ class SOCOrchestrator:
 
         agents = {}
         agent_mapping = {
-            "manager": "SOC_Manager",
-            "triage": "AlertTriageAgent",
-            "hunting": "ThreatHuntingAgent",
-            "response": "IncidentResponseAgent",
-            "intelligence": "ThreatIntelligenceAgent",
+            "manager": "soc-manager",
+            "triage": "alert-triage-agent",
+            "hunting": "threat-hunting-agent",
+            "response": "incident-response-agent",
+            "intelligence": "threat-intelligence-agent",
         }
 
         for role, name in agent_mapping.items():

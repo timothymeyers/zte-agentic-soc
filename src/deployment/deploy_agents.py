@@ -220,12 +220,12 @@ AGENT_DEFINITIONS = {
         "instructions_file": "manager_instructions.md",
         "description": "SOC Manager Agent - Coordinates multi-agent security workflows",
     },
+    "triage": {
+        "name": "alert-triage-agent",
+        "instructions_file": "alert_triage_instructions.md",
+        "description": "Alert Triage Agent - Risk assessment and prioritization",
+    },
     # Future agents to be added in later phases:
-    # "triage": {
-    #     "name": "AlertTriageAgent",
-    #     "instructions_file": "alert_triage_instructions.md",
-    #     "description": "Alert Triage Agent - Risk assessment and prioritization",
-    # },
     # "hunting": {
     #     "name": "ThreatHuntingAgent",
     #     "instructions_file": "threat_hunting_instructions.md",
@@ -338,8 +338,8 @@ async def main():
     logger.info("Starting agent deployment")
 
     try:
-        # Deploy manager agent only for Phase 3
-        agents = await deploy_all_agents(["manager"])
+        # Deploy manager and triage agents for Phase 4
+        agents = await deploy_all_agents(["manager", "triage"])
 
         print("\n" + "=" * 60)
         print("Agent Deployment Complete")
@@ -353,7 +353,9 @@ async def main():
             print(f"  Description: {agent.description}")
 
         print("\n" + "=" * 60)
-        print("✓ Phase 3A: Infrastructure Deployment Complete")
+        print("✓ Phase 4A: Infrastructure Deployment Complete")
+        print("  - Manager Agent: Orchestration")
+        print("  - Triage Agent: Alert analysis and prioritization")
         print("=" * 60)
 
         return 0
