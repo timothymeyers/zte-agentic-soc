@@ -349,8 +349,6 @@ async def main():
             print(f"\n{key.upper()} Agent:")
             print(f"  Name: {agent.name}")
             print(f"  ID: {agent.id}")
-            print(f"  Model: {agent.model}")
-            print(f"  Description: {agent.description}")
 
         print("\n" + "=" * 60)
         print("✓ Phase 4A: Infrastructure Deployment Complete")
