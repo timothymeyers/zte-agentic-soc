@@ -75,7 +75,7 @@ class WorkflowExecutor:
             }
 
             # Stream workflow execution
-            async for event in self.workflow.run(task):
+            async for event in await self.workflow.run(task):
                 if isinstance(event, AgentRunUpdateEvent):
                     event_dict = self._process_event(event)
                     self.events.append(event_dict)
