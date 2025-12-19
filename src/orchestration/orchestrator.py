@@ -17,57 +17,6 @@ from src.shared.logging import get_logger
 logger = get_logger(__name__, module="orchestrator")
 
 
-class ManagerAgentWrapper:
-    """
-    Wraps a Foundry agent to add planning capabilities for Magentic orchestration.
-    
-    Acts as a proxy that implements the AgentProtocol for Magentic compatibility.
-    """
-
-    def __init__(self, foundry_agent):
-        """
-        Initialize wrapper with a Foundry agent.
-        
-        Args:
-            foundry_agent: AIProjectAgent instance from azure-ai-projects SDK
-        """
-        self._agent = foundry_agent
-        self._name = getattr(foundry_agent, 'name', 'manager')
-
-    async def run(self, messages=None, *, thread=None, **kwargs):
-        """
-        Execute agent with messages - delegates to Foundry agent.
-        
-        Args:
-            messages: Messages to send to agent
-            thread: Optional thread for conversation
-            **kwargs: Additional arguments
-            
-        Returns:
-            Agent response
-        """
-        # For Foundry agents, we need to use the agents API properly
-        # The agent is an AIProjectAgent which uses the create_message pattern
-        try:
-            response = self._agent.run(messages, thread=thread, **kwargs) if hasattr(self._agent, 'run') else str(messages)
-            return response
-        except Exception as e:
-            logger.warning("Error executing manager agent", error=str(e))
-            raise
-
-    async def run_stream(self, messages=None, *, thread=None, **kwargs):
-        """Stream agent execution - delegates to Foundry agent."""
-        try:
-            if hasattr(self._agent, 'run_stream'):
-                async for event in await self._agent.run_stream(messages=messages, thread=thread, **kwargs):
-                    yield event
-            else:
-                yield await self._agent.run(messages=messages, thread=thread, **kwargs)
-        except Exception as e:
-            logger.warning("Error streaming manager agent", error=str(e))
-            raise
-
-
 class SOCOrchestrator:
     """
     SOC workflow orchestrator using magentic strategy (MVP).
@@ -102,6 +51,10 @@ class SOCOrchestrator:
         self.max_round_count = max_round_count
         self.max_stall_count = max_stall_count
         self.max_reset_count = max_reset_count
+        
+        # Store credential and client for agent creation
+        self._credential = None
+        self._ai_client = None
 
         logger.info(
             "SOCOrchestrator initialized",
@@ -109,67 +62,6 @@ class SOCOrchestrator:
             max_rounds=max_round_count,
             max_stalls=max_stall_count,
         )
-
-    async def discover_agents_async(self) -> Dict[str, Any]:
-        """
-        Discover existing agents in Microsoft Foundry using AzureAIClient.
-        
-        Retrieves existing agents by name from the Azure AI Foundry project.
-        Uses AzureAIClient to wrap agents so they implement AgentProtocol.
-        
-        Returns:
-            Dictionary mapping agent role to AzureAIClient agent instances
-            that implement AgentProtocol for use with Magentic workflows.
-
-        Note:
-            Agent roles: manager, triage, hunting, response, intelligence
-        """
-        logger.info("Discovering existing agents")
-
-        agents = {}
-        agent_mapping = {
-            "manager": "soc-manager",
-            "triage": "alert-triage-agent",
-            "hunting": "threat-hunting-agent",
-            "response": "incident-response-agent",
-            "intelligence": "threat-intelligence-agent",
-        }
-
-        # Set environment variable for AzureAIClient (it looks for AZURE_AI_PROJECT_ENDPOINT)
-        os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
-
-        # Create async credential for AzureAIClient
-        async with AzureCliCredential() as credential:
-            ai_client = AzureAIClient(
-                credential=credential
-            )
-            
-            for role, name in agent_mapping.items():
-                try:
-                    # Load existing agent by name using AzureAIClient
-                    # use_latest_version=True tells it to load existing agent, not create new one
-                    agent = ai_client.create_agent(
-                        name=name,
-                        use_latest_version=True
-                    )
-                    
-                    agents[role] = agent
-                    logger.info("Agent discovered", role=role, name=name)
-                    
-                except Exception as e:
-                    logger.warning(
-                        "Agent not found",
-                        role=role,
-                        name=name,
-                        error=str(e),
-                    )
-
-        if not agents:
-            logger.error("No agents discovered")
-            raise ValueError("No agents found in Microsoft Foundry project")
-
-        logger.info("Agent discovery complete", agent_count=len(agents))
-        return agents
 
     async def create_workflow(self, agents: Optional[Dict[str, Any]] = None):
         """
@@ -200,28 +92,63 @@ class SOCOrchestrator:
             # 2. Define agent execution order
             # 3. Update max_round_count → max_steps
         """
-        if agents is None:
-            agents = await self.discover_agents_async()
+        logger.info("Creating magentic workflow with AzureAIClient agents")
 
-        logger.info("Creating magentic workflow", agent_count=len(agents))
+        # Set environment variable for AzureAIClient
+        os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
 
-        # Get manager agent (required for magentic)
-        if "manager" not in agents:
-            raise ValueError("Manager agent not found - required for magentic orchestration")
-
-        manager_agent = agents["manager"]
-        
-        # Manager agent from Foundry already implements necessary protocol
-        # Pass it directly to Magentic - don't wrap it
-        manager_executor = manager_agent
-
-        # Build participant dict (exclude manager from participants)
-        # Agents from AzureAIClient already implement AgentProtocol
-        participants = {
-            role: agent
-            for role, agent in agents.items()
-            if role != "manager"
+        # Agent mapping
+        agent_mapping = {
+            "manager": "soc-manager",
+            "triage": "alert-triage-agent",
+            "hunting": "threat-hunting-agent",
+            "response": "incident-response-agent",
+            "intelligence": "threat-intelligence-agent",
         }
+
+        # Create async credential
+        self._credential = AzureCliCredential()
+        
+        # Create AzureAIClient with use_latest_version=True to reuse existing agents
+        self._ai_client = AzureAIClient(
+            credential=self._credential,
+            use_latest_version=True  # Reuse existing agents instead of creating new ones
+        )
+        
+        logger.info("Discovering and loading agents from Microsoft Foundry")
+        
+        # Load manager agent (required for magentic)
+        manager_agent = None
+        try:
+            manager_agent = self._ai_client.create_agent(
+                name=agent_mapping["manager"],
+                instructions="",  # Instructions already defined in Foundry
+            )
+            logger.info("Manager agent loaded", name=agent_mapping["manager"])
+        except Exception as e:
+            logger.error("Failed to load manager agent", error=str(e), exc_info=True)
+            raise ValueError(f"Manager agent not found - required for magentic orchestration: {e}")
+        
+        # Load participant agents
+        participants = {}
+        for role, name in agent_mapping.items():
+            if role == "manager":
+                continue  # Already loaded
+                
+            try:
+                agent = self._ai_client.create_agent(
+                    name=name,
+                    instructions="",  # Instructions already defined in Foundry
+                )
+                participants[role] = agent
+                logger.info("Participant agent loaded", role=role, name=name)
+            except Exception as e:
+                logger.warning(
+                    "Agent not found (optional)",
+                    role=role,
+                    name=name,
+                    error=str(e),
+                )
 
         if not participants:
             logger.warning("No participant agents found - workflow will have limited functionality")
@@ -238,7 +165,7 @@ class SOCOrchestrator:
                 MagenticBuilder()
                 .participants(**participants)  # Agents implement AgentProtocol
                 .with_standard_manager(
-                    manager=manager_executor,  # Manager with planning support
+                    agent=manager_agent,  # Use 'agent' parameter for manager
                     max_round_count=self.max_round_count,
                     max_stall_count=self.max_stall_count,
                     max_reset_count=self.max_reset_count,
@@ -261,6 +188,18 @@ class SOCOrchestrator:
                 exc_info=True,
             )
             raise
+
+    async def cleanup(self):
+        """
+        Cleanup resources (credential, client).
+        
+        Should be called when done with orchestrator.
+        """
+        if self._credential:
+            await self._credential.close()
+            self._credential = None
+        self._ai_client = None
+        logger.info("Orchestrator resources cleaned up")
 
     def get_workflow_config(self) -> Dict:
         """
@@ -288,7 +227,7 @@ class SOCOrchestrator:
 # =============================================================================
 
 
-def create_soc_workflow(
+async def create_soc_workflow(
     max_round_count: int = 10,
     max_stall_count: int = 3,
     max_reset_count: int = 2,
@@ -296,15 +235,13 @@ def create_soc_workflow(
     """
     Create SOC workflow with default configuration.
 
-    NOTE: This is a sync wrapper - callers should handle async creation.
-
     Args:
         max_round_count: Maximum collaboration rounds (default: 10)
         max_stall_count: Rounds without progress before intervention (default: 3)
         max_reset_count: Maximum plan resets allowed (default: 2)
 
     Returns:
-        A coroutine that, when awaited, returns a Workflow instance
+        Workflow instance ready for execution
 
     Example:
         >>> import asyncio
@@ -314,15 +251,14 @@ def create_soc_workflow(
         ...         print(event)
         >>> asyncio.run(main())
     """
-    async def _create():
-        orchestrator = SOCOrchestrator(
-            max_round_count=max_round_count,
-            max_stall_count=max_stall_count,
-            max_reset_count=max_reset_count,
-        )
-        return await orchestrator.create_workflow()
+    orchestrator = SOCOrchestrator(
+        max_round_count=max_round_count,
+        max_stall_count=max_stall_count,
+        max_reset_count=max_reset_count,
+    )
     
-    return _create()
+    workflow = await orchestrator.create_workflow()
+    return workflow
 
 
 # =============================================================================
