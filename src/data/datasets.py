@@ -6,7 +6,7 @@ Loads and transforms GUIDE and Attack datasets to Sentinel-compatible format.
 
 import os
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Iterator, List, Optional
 from uuid import uuid4
 
 import pandas as pd

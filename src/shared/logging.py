@@ -7,7 +7,7 @@ Provides JSON-formatted structured logging with OpenTelemetry integration.
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 import structlog

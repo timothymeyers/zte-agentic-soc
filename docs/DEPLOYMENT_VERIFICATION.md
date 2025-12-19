@@ -1,6 +1,6 @@
 # Agent Deployment Verification Guide
 
-This guide explains how to verify that agents can be successfully created in Microsoft Foundry.
+This guide explains how to verify that agents can be successfully created in Microsoft Foundry using **azure-ai-projects 2.0.0b1+**.
 
 ## Prerequisites
 
@@ -13,78 +13,101 @@ This guide explains how to verify that agents can be successfully created in Mic
    ```bash
    export AZURE_AI_FOUNDRY_PROJECT_ENDPOINT="https://your-foundry.services.ai.azure.com/api/projects/your-project"
    export AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4.1-mini"
+   # OR
+   export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4.1-mini"
    ```
 
 3. **Python Dependencies**
    Install the project dependencies:
    ```bash
-   pip install azure-ai-agents azure-ai-projects azure-identity structlog
+   pip install --pre 'azure-ai-projects>=2.0.0b1' azure-identity
    ```
 
 ## Verification Methods
 
 ### Method 1: Using the Test Script
 
-Run the included test script to verify agent deployment:
+Run the included test script to verify agent deployment with azure-ai-projects 2.0.0b1+:
 
 ```bash
-python test_agent_deployment.py
+python test_agent_api.py
 ```
 
 **Expected Output:**
 ```
 ================================================================================
-Testing Agent Deployment to Microsoft Foundry
+Testing azure-ai-projects 2.0.0b1+ Agent API
 ================================================================================
 
 1. Checking environment variables...
-✓ Endpoint: https://asoc-foundry.services.ai.azure.com/api/projects/asoc
+✓ Endpoint: https://asoc-foundry.services.ai.azure.com/api/******/asoc
 ✓ Model: gpt-4.1-mini
 
-2. Initializing AgentDeployer...
-✓ AgentDeployer initialized successfully
+2. Initializing AIProjectClient...
+✓ AIProjectClient initialized successfully
 
 3. Listing existing agents...
-✓ Found 19 existing agents
-  - alert-triage-agent (id: asst_D8t6dYxJcjXfs7yi4CwXfhBH)
-  - AlertTriageAgent (id: asst_iCaYIHWv3snQUuuX9rP5haiR)
-  ...
+✓ Found 3 existing agents
 
-4. Deploying SOC_Manager agent...
-✓ Agent deployed successfully!
-  - Name: SOC_Manager
-  - ID: asst_8gCfxoJmrj0h1fdMH2Te6r8Z
-  - Model: gpt-4.1-mini
-  - Created: 2025-12-18 21:08:18+00:00
+  First few agents:
+  - alert-triage-agent (version: N/A, id: alert-triage-agent...)
+  - AlertTriageTim (version: N/A, id: AlertTriageTim...)
+  - AlertTriageAgentNew (version: N/A, id: AlertTriageAgentNew...)
+
+4. Testing get(agent_name=...)...
+✓ Retrieved agent 'alert-triage-agent'
+  - ID: alert-triage-agent
+  - Kind: N/A
+  - Created: N/A
+
+5. Testing create_version (create or update agent)...
+✓ Agent created/updated successfully
+  - Name: test-api-agent
+  - ID: test-api-agent:1
+  - Version: 1
+  - Kind: N/A
+  - Created: 2025-12-19 14:40:27+00:00
 
 ================================================================================
-✅ All tests passed! Agent deployment is working correctly.
+✅ All API tests passed! Agent deployment is working correctly.
 ================================================================================
 ```
 
 ### Method 2: Using Python REPL
 
-Test agent deployment interactively:
+Test agent deployment interactively with azure-ai-projects 2.0.0b1+:
 
 ```python
-from src.deployment.deploy_agents import AgentDeployer, AGENT_DEFINITIONS
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
+import os
 
-# Initialize deployer
-deployer = AgentDeployer()
-
-# List existing agents
-agents = deployer.list_agents()
-print(f"Found {len(agents)} agents")
-
-# Deploy manager agent
-manager_def = AGENT_DEFINITIONS["manager"]
-agent = deployer.deploy_agent(
-    name=manager_def["name"],
-    instructions_file=manager_def["instructions_file"],
-    description=manager_def["description"],
+# Initialize client
+endpoint = os.getenv("AZURE_AI_FOUNDRY_PROJECT_ENDPOINT")
+client = AIProjectClient(
+    endpoint=endpoint,
+    credential=DefaultAzureCredential()
 )
 
-print(f"✓ Agent deployed: {agent.name} (ID: {agent.id})")
+# List existing agents
+agents = list(client.agents.list())
+print(f"Found {len(agents)} agents")
+
+# Get an existing agent by name
+agent = client.agents.get(agent_name="alert-triage-agent")
+print(f"Retrieved: {agent.name} (ID: {agent.id})")
+
+# Create or update an agent
+agent = client.agents.create_version(
+    agent_name="test-agent",
+    definition=PromptAgentDefinition(
+        model="gpt-4.1-mini",
+        instructions="You are a helpful assistant.",
+    ),
+    description="Test agent"
+)
+print(f"Created/Updated: {agent.name} (ID: {agent.id}, Version: {agent.version})")
 ```
 
 ### Method 3: Using the CLI
@@ -92,14 +115,21 @@ print(f"✓ Agent deployed: {agent.name} (ID: {agent.id})")
 If you have the CLI installed, you can use:
 
 ```bash
-# Deploy agents
-python -m src.demo.cli deploy
+# Deploy agents to Microsoft Foundry
+asoc deploy
 
 # List deployed agents
-python -m src.demo.cli list-agents
+asoc list-agents
 
-# Cleanup agents
-python -m src.demo.cli cleanup
+# Cleanup agents (use with caution)
+asoc cleanup
+```
+
+Or run directly with Python:
+
+```bash
+python -m src.demo.cli deploy
+python -m src.demo.cli list-agents
 ```
 
 ## Troubleshooting
@@ -133,52 +163,74 @@ python -m src.demo.cli cleanup
 
 ## SDK Details
 
-### Using AgentsClient (azure-ai-agents 1.1.0)
+### Using AIProjectClient (azure-ai-projects 2.0.0b1+)
 
-The project uses `AgentsClient` from the `azure-ai-agents` package:
+The project uses `AIProjectClient` from the `azure-ai-projects` package (version 2.0.0b1 or higher):
 
 ```python
-from azure.ai.agents import AgentsClient
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
 
 # Initialize client
-client = AgentsClient(
-    endpoint="https://your-endpoint.services.ai.azure.com/api/projects/project-name",
+client = AIProjectClient(
+    endpoint="https://your-foundry.services.ai.azure.com/api/projects/project-name",
     credential=DefaultAzureCredential()
 )
 
-# Create agent
-agent = client.create_agent(
-    model="gpt-4.1-mini",
+# Create new agent
+agent = client.agents.create(
     name="MyAgent",
-    instructions="You are a helpful assistant",
+    definition=PromptAgentDefinition(
+        model="gpt-4.1-mini",
+        instructions="You are a helpful assistant",
+    ),
     description="My custom agent"
 )
 
-# List agents
-agents = client.list_agents()
+# Update existing agent (creates new version)
+agent = client.agents.create_version(
+    agent_name="MyAgent",
+    definition=PromptAgentDefinition(
+        model="gpt-4.1-mini",
+        instructions="Updated instructions",
+    ),
+    description="Updated description"
+)
 
-# Get agent by ID
-agent = client.get_agent(agent_id="asst_12345...")
+# Get agent by name
+agent = client.agents.get(agent_name="MyAgent")
+
+# List all agents
+agents = list(client.agents.list())
 
 # Delete agent
-client.delete_agent(agent_id="asst_12345...")
+client.agents.delete(agent_name="MyAgent")
+
+# Interact with agent using OpenAI client
+openai_client = client.get_openai_client()
+response = openai_client.responses.create(
+    input=[{"role": "user", "content": "Hello!"}],
+    extra_body={"agent": {"name": agent.name, "type": "agent_reference"}},
+)
+print(response.output_text)
 ```
 
 ### Version Requirements
 
-- **azure-ai-agents**: ≥1.1.0
-- **azure-ai-projects**: ==1.0.0b3
+- **azure-ai-projects**: ≥2.0.0b1 (pre-release, install with `--pre` flag)
 - **azure-identity**: ≥1.15.0
+- **openai**: ≥1.0.0 (optional, for agent interaction testing)
 
 ## API Endpoints
 
-The AgentsClient communicates with:
+The AIProjectClient.agents interface communicates with Microsoft Foundry v2 Agent API:
 ```
-POST   /api/projects/{project}/assistants          # Create agent
-GET    /api/projects/{project}/assistants          # List agents
-GET    /api/projects/{project}/assistants/{id}     # Get agent
-DELETE /api/projects/{project}/assistants/{id}     # Delete agent
+POST   /api/projects/{project}/agents              # Create agent
+POST   /api/projects/{project}/agents/{name}       # Create version (update)
+GET    /api/projects/{project}/agents              # List agents
+GET    /api/projects/{project}/agents/{name}       # Get agent by name
+DELETE /api/projects/{project}/agents/{name}       # Delete agent
 ```
 
 ## Next Steps
@@ -191,6 +243,6 @@ After verifying agent deployment:
 
 ## References
 
-- [Azure AI Agents Python SDK](https://learn.microsoft.com/en-us/python/api/azure-ai-agents)
-- [Azure AI Projects SDK](https://learn.microsoft.com/en-us/python/api/azure-ai-projects)
+- [Azure AI Projects Python SDK](https://learn.microsoft.com/en-us/python/api/azure-ai-projects)
 - [Microsoft Foundry Documentation](https://learn.microsoft.com/en-us/azure/ai-foundry)
+- [DefaultAzureCredential Authentication](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential)

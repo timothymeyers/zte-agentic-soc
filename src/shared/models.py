@@ -5,12 +5,12 @@ These models align with Microsoft Sentinel/Defender XDR schemas where applicable
 and extend them for agent-specific requirements.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 # =============================================================================
@@ -102,7 +102,7 @@ class SecurityAlert(BaseModel):
     """
 
     alert_id: UUID = Field(default_factory=uuid4, alias="AlertId")
-    time_generated: datetime = Field(default_factory=datetime.utcnow, alias="TimeGenerated")
+    time_generated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), alias="TimeGenerated")
     alert_name: str = Field(alias="AlertName")
     alert_type: str = Field(alias="AlertType")
     severity: Severity = Field(alias="Severity")

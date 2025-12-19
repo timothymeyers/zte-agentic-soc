@@ -104,7 +104,7 @@ All development follows the constitutional framework with emphasis on:
    python3.11 -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    
-   # Install dependencies
+   # Install dependencies (including pre-release azure-ai-projects)
    pip install --upgrade pip
    pip install -e ".[dev]"
    ```
@@ -120,7 +120,7 @@ All development follows the constitutional framework with emphasis on:
    # - AZURE_SUBSCRIPTION_ID
    # - AZURE_RESOURCE_GROUP
    # - AZURE_AI_FOUNDRY_PROJECT_ENDPOINT
-   # - AZURE_OPENAI_DEPLOYMENT_NAME
+   # - AZURE_OPENAI_DEPLOYMENT_NAME (or AZURE_AI_MODEL_DEPLOYMENT_NAME)
    ```
 
 4. **Verify Azure authentication**:
@@ -132,20 +132,25 @@ All development follows the constitutional framework with emphasis on:
    az group show --name asoc-zte-rg
    ```
 
-5. **Run linting and tests**:
+5. **Verify agent deployment**:
+   ```bash
+   # Run the agent API test
+   python test_agent_api.py
+   
+   # Expected: All tests pass, agent created successfully
+   ```
+
+6. **Run linting and tests** (optional):
    ```bash
    # Format code
-   black src/ tests/
+   black src/
    
    # Run linters
-   ruff check src/ tests/
+   ruff check src/
    pylint src/
    
    # Run type checking
    mypy src/
-   
-   # Run tests (when available)
-   pytest tests/
    ```
 
 ### Development Workflow
@@ -165,13 +170,20 @@ All development follows the constitutional framework with emphasis on:
    - `.env` - Environment variables (not committed)
    - `.env.example` - Environment variable template
 
-3. **Running the Demo** (coming soon):
+3. **Agent Deployment & Demo**:
    ```bash
-   # Deploy agents to Microsoft Foundry
-   python -m src.demo.cli deploy
+   # Verify agent API is working
+   python test_agent_api.py
    
-   # Run a demo scenario
-   python -m src.demo.cli run-workflow alert_triage
+   # Deploy agents to Microsoft Foundry (Phase 3+)
+   asoc deploy
+   
+   # List deployed agents
+   asoc list-agents
+   
+   # Run a demo scenario (Phase 4+)
+   asoc run-workflow brute_force
+   asoc stream-alerts --limit 5
    ```
 
 ### Architecture Overview
@@ -179,23 +191,29 @@ All development follows the constitutional framework with emphasis on:
 The Agentic SOC uses a **two-phase architecture**:
 
 **Phase A: Infrastructure Deployment**
-- Deploy AI agents to Microsoft Foundry using `azure-ai-projects` SDK
-- Agents are cloud-hosted and persistent
-- Instructions define agent behavior (no tools initially)
+- Deploy AI agents to Microsoft Foundry using `azure-ai-projects>=2.0.0b1` SDK
+- Uses `AIProjectClient` with `create_version()` for agent creation/updates
+- Retrieves agents with `get(agent_name=...)` for orchestration
+- Agents are cloud-hosted and persistent with versioning support
 
 **Phase B: Runtime Orchestration**
 - Use Microsoft Agent Framework's magentic orchestrator for coordination
-- Manager agent selects appropriate specialized agents
+- Manager agent selects appropriate specialized agents dynamically
 - Context shared between agents via Sentinel incidents and Cosmos DB
+- Agent interaction through OpenAI client with agent references
 
 ### MVP Implementation Status
 
-- [x] Phase 1: Setup (project structure, dependencies, configuration)
-- [ ] Phase 2: Foundational (models, auth, logging, mock data)
-- [ ] Phase 3: Orchestration (manager agent, magentic workflow)
-- [ ] Phase 4: Alert Triage Agent (P1 - first agent)
-- [ ] Phase 5-7: Additional agents (Intelligence, Hunting, Response)
-- [ ] Phase 8+: Integration, infrastructure, polish
+- [x] **Phase 1: Setup** - Project structure, dependencies, configuration
+- [x] **Phase 2: Foundational** - Pydantic models, auth, logging, mock data
+- [x] **Phase 3: Orchestration** - Manager agent, magentic workflow, agent deployment
+  - ✅ Agent deployment with azure-ai-projects 2.0.0b1+
+  - ✅ SOCOrchestrator with magentic coordination
+  - ✅ CLI commands for deployment and workflows
+  - ✅ Verified working with test_agent_api.py
+- [ ] **Phase 4: Alert Triage Agent** (P1 - first specialized agent)
+- [ ] **Phase 5-7: Additional agents** (Intelligence, Hunting, Response)
+- [ ] **Phase 8+: Integration, infrastructure, polish**
 
 ## License
 
