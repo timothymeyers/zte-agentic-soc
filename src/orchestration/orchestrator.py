@@ -109,22 +109,50 @@ class SOCOrchestrator:
         # Create async credential
         self._credential = AzureCliCredential()
         
-        # Create AzureAIClient with use_latest_version=True to reuse existing agents
-        self._ai_client = AzureAIClient(
-            credential=self._credential,
-            use_latest_version=True  # Reuse existing agents instead of creating new ones
+        # Get model deployment name from environment
+        model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4-1-mini")
+        logger.info("Using model for agents", model_id=model_id)
+        
+        # Create AIProjectClient to list agents
+        from azure.ai.projects.aio import AIProjectClient
+        project_client = AIProjectClient(
+            endpoint=self.project_endpoint,
+            credential=self._credential
         )
         
-        logger.info("Discovering and loading agents from Microsoft Foundry")
+        # List all agents to get their IDs (includes version)
+        logger.info("Listing agents from Microsoft Foundry")
+        agents_list = project_client.agents.list()
+        
+        # Build mapping of agent name to agent ID (name:version format)
+        agent_ids = {}
+        async for agent in agents_list:
+            agent_ids[agent.name] = agent.id
+            logger.debug("Found agent", name=agent.name, id=agent.id)
+        
+        logger.info("Discovered agents", count=len(agent_ids), agents=list(agent_ids.keys()))
+        
+        logger.info("Loading agents from Microsoft Foundry")
         
         # Load manager agent (required for magentic)
         manager_agent = None
+        manager_name = agent_mapping["manager"]
+        if manager_name not in agent_ids:
+            raise ValueError(f"Manager agent '{manager_name}' not found in Foundry - required for magentic orchestration")
+        
         try:
-            manager_agent = self._ai_client.create_agent(
-                name=agent_mapping["manager"],
+            # Create AzureAIClient specifically for the manager agent
+            manager_client = AzureAIClient(
+                credential=self._credential,
+                model_deployment_name=model_id,
+                project_client=project_client,
+                agent_name=agent_ids[manager_name],  # Set the agent name for this client
+            )
+            # Create the agent (no need to pass agent_name again)
+            manager_agent = manager_client.create_agent(
                 instructions="",  # Instructions already defined in Foundry
             )
-            logger.info("Manager agent loaded", name=agent_mapping["manager"])
+            logger.info("Manager agent loaded", name=manager_name, id=agent_ids[manager_name])
         except Exception as e:
             logger.error("Failed to load manager agent", error=str(e), exc_info=True)
             raise ValueError(f"Manager agent not found - required for magentic orchestration: {e}")
@@ -134,17 +162,28 @@ class SOCOrchestrator:
         for role, name in agent_mapping.items():
             if role == "manager":
                 continue  # Already loaded
+            
+            if name not in agent_ids:
+                logger.warning("Agent not found in Foundry", role=role, name=name)
+                continue
                 
             try:
-                agent = self._ai_client.create_agent(
-                    name=name,
+                # Create AzureAIClient specifically for this agent
+                agent_client = AzureAIClient(
+                    credential=self._credential,
+                    model_deployment_name=model_id,
+                    project_client=project_client,
+                    agent_name=agent_ids[name],  # Set the agent name for this client
+                )
+                # Create the agent (no need to pass agent_name again)
+                agent = agent_client.create_agent(
                     instructions="",  # Instructions already defined in Foundry
                 )
                 participants[role] = agent
-                logger.info("Participant agent loaded", role=role, name=name)
+                logger.info("Participant agent loaded", role=role, name=name, id=agent_ids[name])
             except Exception as e:
                 logger.warning(
-                    "Agent not found (optional)",
+                    "Failed to load agent",
                     role=role,
                     name=name,
                     error=str(e),
