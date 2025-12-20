@@ -5,10 +5,12 @@ Implements magentic workflow creation with clear plugin point for alternative st
 """
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from agent_framework import MagenticBuilder
-from agent_framework.azure import AzureAIClient
+from agent_framework import ChatAgent, MagenticBuilder
+from agent_framework.azure import AzureAIClient, AzureOpenAIChatClient
+from azure.identity import AzureCliCredential as SyncAzureCliCredential
 from azure.identity.aio import AzureCliCredential
 
 from src.shared.auth import get_project_credential, get_project_endpoint
@@ -92,27 +94,61 @@ class SOCOrchestrator:
             # 2. Define agent execution order
             # 3. Update max_round_count → max_steps
         """
-        logger.info("Creating magentic workflow with AzureAIClient agents")
+        logger.info("Creating magentic workflow with mixed agents")
+        logger.info("Manager: Standard ChatAgent with Azure OpenAI")
+        logger.info("Participants: Foundry agents via AzureAIClient")
 
         # Set environment variable for AzureAIClient
         os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
 
-        # Agent mapping
-        agent_mapping = {
-            "manager": "soc-manager",
+        # Agent mapping for participants (not manager)
+        participant_mapping = {
             "triage": "alert-triage-agent",
             "hunting": "threat-hunting-agent",
             "response": "incident-response-agent",
             "intelligence": "threat-intelligence-agent",
         }
 
-        # Create async credential
+        # Create credentials (sync for manager, async for Foundry agents)
+        sync_credential = SyncAzureCliCredential()
         self._credential = AzureCliCredential()
         
         # Get model deployment name from environment
         model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4-1-mini")
         logger.info("Using model for agents", model_id=model_id)
         
+        # Create manager agent using standard ChatAgent (not Foundry agent)
+        # This avoids the 400 Bad Request issue with Azure AI Agent Responses API
+        logger.info("Creating standard ChatAgent for manager")
+        
+        # Load manager instructions from file
+        agent_definitions_path = Path(__file__).parent.parent / "deployment" / "agent_definitions"
+        manager_instructions_file = agent_definitions_path / "manager_instructions.md"
+        
+        if not manager_instructions_file.exists():
+            raise FileNotFoundError(f"Manager instructions not found: {manager_instructions_file}")
+        
+        with open(manager_instructions_file, "r", encoding="utf-8") as f:
+            manager_instructions = f.read()
+        
+        logger.info("Manager instructions loaded", size=len(manager_instructions))
+        
+        # Create Azure OpenAI chat client for manager (uses sync credential)
+        manager_chat_client = AzureOpenAIChatClient(
+            credential=sync_credential,
+            deployment_name=model_id,
+        )
+        
+        # Create standard ChatAgent for manager
+        manager_agent = ChatAgent(
+            name="soc-manager",
+            instructions=manager_instructions,
+            chat_client=manager_chat_client,
+        )
+        
+        logger.info("Manager ChatAgent created", name="soc-manager")
+        
+        # Load participant agents from Foundry
         # Create AIProjectClient to list agents
         from azure.ai.projects.aio import AIProjectClient
         project_client = AIProjectClient(
@@ -121,7 +157,7 @@ class SOCOrchestrator:
         )
         
         # List all agents to get their IDs (includes version)
-        logger.info("Listing agents from Microsoft Foundry")
+        logger.info("Listing participant agents from Microsoft Foundry")
         agents_list = project_client.agents.list()
         
         # Build mapping of agent name to agent ID (name:version format)
@@ -130,45 +166,18 @@ class SOCOrchestrator:
             agent_ids[agent.name] = agent.id
             logger.debug("Found agent", name=agent.name, id=agent.id)
         
-        logger.info("Discovered agents", count=len(agent_ids), agents=list(agent_ids.keys()))
+        logger.info("Discovered Foundry agents", count=len(agent_ids), agents=list(agent_ids.keys()))
         
-        logger.info("Loading agents from Microsoft Foundry")
-        
-        # Load manager agent (required for magentic)
-        manager_agent = None
-        manager_name = agent_mapping["manager"]
-        if manager_name not in agent_ids:
-            raise ValueError(f"Manager agent '{manager_name}' not found in Foundry - required for magentic orchestration")
-        
-        try:
-            # Create AzureAIClient specifically for the manager agent
-            manager_client = AzureAIClient(
-                credential=self._credential,
-                model_deployment_name=model_id,
-                project_client=project_client,
-                agent_name=agent_ids[manager_name],  # Set the agent name for this client
-            )
-            # Create the agent (no need to pass agent_name again)
-            manager_agent = manager_client.create_agent(
-                instructions="",  # Instructions already defined in Foundry
-            )
-            logger.info("Manager agent loaded", name=manager_name, id=agent_ids[manager_name])
-        except Exception as e:
-            logger.error("Failed to load manager agent", error=str(e), exc_info=True)
-            raise ValueError(f"Manager agent not found - required for magentic orchestration: {e}")
-        
-        # Load participant agents
+        # Load participant agents from Foundry
+        logger.info("Loading participant agents from Microsoft Foundry")
         participants = {}
-        for role, name in agent_mapping.items():
-            if role == "manager":
-                continue  # Already loaded
-            
+        for role, name in participant_mapping.items():
             if name not in agent_ids:
-                logger.warning("Agent not found in Foundry", role=role, name=name)
+                logger.warning("Participant agent not found in Foundry", role=role, name=name)
                 continue
                 
             try:
-                # Create AzureAIClient specifically for this agent
+                # Create AzureAIClient specifically for this participant agent
                 agent_client = AzureAIClient(
                     credential=self._credential,
                     model_deployment_name=model_id,
@@ -183,7 +192,7 @@ class SOCOrchestrator:
                 logger.info("Participant agent loaded", role=role, name=name, id=agent_ids[name])
             except Exception as e:
                 logger.warning(
-                    "Failed to load agent",
+                    "Failed to load participant agent",
                     role=role,
                     name=name,
                     error=str(e),
