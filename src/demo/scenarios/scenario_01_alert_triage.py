@@ -8,10 +8,9 @@ correlation detection, and natural language explanations.
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import List
 from uuid import uuid4
 
-from src.data.scenarios import Scenario, ScenarioManager, ScenarioType
+from src.data.scenarios import Scenario, ScenarioType
 from src.orchestration.orchestrator import SOCOrchestrator
 from src.shared.logging import get_logger
 from src.shared.models import SecurityAlert, Severity
@@ -280,27 +279,12 @@ async def run_alert_triage_scenario():
         # Initialize orchestrator
         orchestrator = SOCOrchestrator()
         
-        # Discover agents
-        print("\nDiscovering agents in Microsoft Foundry...")
-        agents = orchestrator.discover_agents()
-        
-        print(f"\nFound {len(agents)} agent(s):")
-        for role, agent in agents.items():
-            print(f"  • {role}: {agent.name} (ID: {agent.id})")
-        
-        # Verify triage agent is available
-        if "triage" not in agents:
-            logger.error("Alert Triage Agent not found")
-            print("\n❌ ERROR: Alert Triage Agent not deployed")
-            print("   Run: python -m src.demo.cli deploy")
-            return
-        
-        # Create workflow
+        # Create workflow (agents are discovered internally by the orchestrator)
         print("\n" + "-" * 80)
-        print("Creating magentic workflow...")
+        print("Creating magentic workflow and loading agents from Microsoft Foundry...")
         print("-" * 80)
         
-        workflow = orchestrator.create_workflow(agents)
+        workflow = await orchestrator.create_workflow()
         print("\n✓ Workflow created successfully")
         
         # Process each alert through the workflow
@@ -332,7 +316,7 @@ async def run_alert_triage_scenario():
             
             # Run workflow with alert
             try:
-                async for event in workflow.run(triage_request):
+                async for event in workflow.run_stream(triage_request):
                     # Process workflow events
                     if hasattr(event, "agent_name"):
                         print(f"  → {event.agent_name}: {event.message[:100]}...")
