@@ -113,9 +113,28 @@ class SOCOrchestrator:
         sync_credential = SyncAzureCliCredential()
         self._credential = AzureCliCredential()
         
-        # Get model deployment name from environment
+        # Get model deployment name and endpoint from environment
         model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4-1-mini")
-        logger.info("Using model for agents", model_id=model_id)
+        openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        
+        if not openai_endpoint:
+            raise ValueError(
+                "AZURE_OPENAI_ENDPOINT environment variable is required for manager agent. "
+                "Set it to your Azure OpenAI endpoint (e.g., https://xxx.openai.azure.com/)"
+            )
+        
+        # Azure OpenAI SDK expects base URL without /openai/v1/ suffix
+        # Strip it if present to avoid duplicate path segments
+        if openai_endpoint.endswith("/openai/v1/"):
+            openai_endpoint = openai_endpoint.replace("/openai/v1/", "/")
+        elif openai_endpoint.endswith("/openai/v1"):
+            openai_endpoint = openai_endpoint.replace("/openai/v1", "")
+        
+        logger.info("Using Azure OpenAI for manager", 
+                   endpoint=openai_endpoint, 
+                   deployment=model_id,
+                   api_version=api_version)
         
         # Create manager agent using standard ChatAgent (not Foundry agent)
         # This avoids the 400 Bad Request issue with Azure AI Agent Responses API
@@ -137,6 +156,8 @@ class SOCOrchestrator:
         manager_chat_client = AzureOpenAIChatClient(
             credential=sync_credential,
             deployment_name=model_id,
+            endpoint=openai_endpoint,
+            api_version=api_version,
         )
         
         # Create standard ChatAgent for manager
