@@ -89,7 +89,7 @@ class AgentDeployer:
         """
         Deploy a specialized agent to Microsoft Foundry.
         
-        Creates a new agent or returns existing agent if it already exists.
+        Creates a new agent or creates a new version if agent already exists.
 
         Args:
             name: Agent name
@@ -97,7 +97,7 @@ class AgentDeployer:
             description: Agent description
 
         Returns:
-            Deployed agent object (AgentObject from azure.ai.projects)
+            Deployed agent object (AgentVersionObject from create_version or AgentObject from create)
         """
         logger.info("Deploying agent", name=name, instructions_file=instructions_file)
 
@@ -127,15 +127,34 @@ class AgentDeployer:
         except Exception as e:
             # Check if agent already exists (409 Conflict)
             if "already exists" in str(e) or "409" in str(e):
-                logger.info("Agent already exists, retrieving existing agent", name=name)
+                logger.info("Agent already exists, creating new version", name=name)
                 existing_agent = self.get_agent(name)
                 if existing_agent:
-                    logger.info(
-                        "Agent retrieved",
-                        agent_id=existing_agent.id,
-                        name=name,
-                    )
-                    return existing_agent
+                    try:
+                        # Create a new version of the existing agent
+                        agent_version = self.client.agents.create_version(
+                            agent_name=name,
+                            definition=PromptAgentDefinition(
+                                model=self.model_deployment,
+                                instructions=instructions,
+                            ),
+                            description=description,
+                        )
+                        logger.info(
+                            "Agent version created successfully",
+                            agent_id=existing_agent.id,
+                            name=name,
+                            version=getattr(agent_version, 'version', 'unknown'),
+                        )
+                        return agent_version
+                    except Exception as version_error:
+                        logger.error(
+                            "Failed to create agent version",
+                            name=name,
+                            error=str(version_error),
+                            exc_info=True,
+                        )
+                        raise
             
             logger.error(
                 "Failed to deploy agent",
@@ -220,12 +239,12 @@ AGENT_DEFINITIONS = {
         "instructions_file": "manager_instructions.md",
         "description": "SOC Manager Agent - Coordinates multi-agent security workflows",
     },
+    "triage": {
+        "name": "alert-triage-agent",
+        "instructions_file": "alert_triage_instructions.md",
+        "description": "Alert Triage Agent - Risk assessment and prioritization",
+    },
     # Future agents to be added in later phases:
-    # "triage": {
-    #     "name": "AlertTriageAgent",
-    #     "instructions_file": "alert_triage_instructions.md",
-    #     "description": "Alert Triage Agent - Risk assessment and prioritization",
-    # },
     # "hunting": {
     #     "name": "ThreatHuntingAgent",
     #     "instructions_file": "threat_hunting_instructions.md",
@@ -338,8 +357,8 @@ async def main():
     logger.info("Starting agent deployment")
 
     try:
-        # Deploy manager agent only for Phase 3
-        agents = await deploy_all_agents(["manager"])
+        # Deploy manager and triage agents for Phase 4
+        agents = await deploy_all_agents(["manager", "triage"])
 
         print("\n" + "=" * 60)
         print("Agent Deployment Complete")
@@ -349,11 +368,11 @@ async def main():
             print(f"\n{key.upper()} Agent:")
             print(f"  Name: {agent.name}")
             print(f"  ID: {agent.id}")
-            print(f"  Model: {agent.model}")
-            print(f"  Description: {agent.description}")
 
         print("\n" + "=" * 60)
-        print("✓ Phase 3A: Infrastructure Deployment Complete")
+        print("✓ Phase 4A: Infrastructure Deployment Complete")
+        print("  - Manager Agent: Orchestration")
+        print("  - Triage Agent: Alert analysis and prioritization")
         print("=" * 60)
 
         return 0

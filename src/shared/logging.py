@@ -15,7 +15,7 @@ import structlog
 
 def setup_logging(
     log_level: Optional[str] = None,
-    enable_json: bool = True,
+    enable_json: bool = False,
     correlation_id: Optional[str] = None,
 ) -> None:
     """
@@ -25,10 +25,11 @@ def setup_logging(
         log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
                   Defaults to LOG_LEVEL environment variable or INFO.
         enable_json: If True, use JSON formatter. If False, use console formatter.
+                  Defaults to False for cleaner CLI output.
         correlation_id: Optional correlation ID for distributed tracing.
 
     Example:
-        >>> setup_logging(log_level="DEBUG", enable_json=True)
+        >>> setup_logging(log_level="DEBUG", enable_json=False)
         >>> logger = get_logger("my_module")
         >>> logger.info("Application started", component="api", version="1.0.0")
     """
@@ -63,7 +64,8 @@ def setup_logging(
     if enable_json:
         processors.append(structlog.processors.JSONRenderer())
     else:
-        processors.append(structlog.dev.ConsoleRenderer())
+        # Use development-friendly console output
+        processors.append(structlog.dev.ConsoleRenderer(colors=True))
 
     # Configure structlog
     structlog.configure(
@@ -80,6 +82,17 @@ def setup_logging(
         stream=sys.stdout,
         level=level,
     )
+
+    # Suppress verbose logging from Azure SDK and other libraries
+    # These libraries log HTTP request/response details at DEBUG level
+    logging.getLogger("azure.core").setLevel(logging.ERROR)
+    logging.getLogger("azure.identity").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("requests").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.ERROR)
+    logging.getLogger("aiohttp").setLevel(logging.ERROR)
+    logging.getLogger("asyncio").setLevel(logging.ERROR)
+    logging.getLogger("agent_framework").setLevel(logging.ERROR)
 
 
 def get_logger(name: str, **initial_context: Any) -> structlog.stdlib.BoundLogger:

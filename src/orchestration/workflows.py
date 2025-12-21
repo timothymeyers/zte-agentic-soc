@@ -6,7 +6,7 @@ Handles workflow execution with event streaming and progress tracking.
 
 from datetime import datetime, timezone
 from typing import AsyncIterator, Dict, List, Optional
-from uuid4 import uuid4
+from uuid import uuid4
 
 from agent_framework import AgentRunUpdateEvent
 
@@ -75,7 +75,7 @@ class WorkflowExecutor:
             }
 
             # Stream workflow execution
-            async for event in self.workflow.run(task):
+            async for event in self.workflow.run_stream(task):
                 if isinstance(event, AgentRunUpdateEvent):
                     event_dict = self._process_event(event)
                     self.events.append(event_dict)

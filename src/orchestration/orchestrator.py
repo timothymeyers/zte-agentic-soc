@@ -4,10 +4,14 @@ Magentic orchestrator setup for Agentic SOC.
 Implements magentic workflow creation with clear plugin point for alternative strategies.
 """
 
+import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from agent_framework import MagenticBuilder
-from azure.ai.projects import AIProjectClient
+from agent_framework import ChatAgent, MagenticBuilder
+from agent_framework.azure import AzureAIClient, AzureOpenAIChatClient
+from azure.identity import AzureCliCredential as SyncAzureCliCredential
+from azure.identity.aio import AzureCliCredential
 
 from src.shared.auth import get_project_credential, get_project_endpoint
 from src.shared.logging import get_logger
@@ -23,7 +27,7 @@ class SOCOrchestrator:
     The create_workflow() method can be replaced with alternative implementations
     (sequential, concurrent, custom, Azure Durable Functions) by modifying this class.
     
-    Uses azure-ai-projects SDK (2.0.0b1+) with AIProjectClient for agent management.
+    Uses agent_framework's AzureAIClient (v2 API) for agent-compatible agents.
     """
 
     def __init__(
@@ -49,12 +53,10 @@ class SOCOrchestrator:
         self.max_round_count = max_round_count
         self.max_stall_count = max_stall_count
         self.max_reset_count = max_reset_count
-
-        # Initialize AIProjectClient (azure-ai-projects 2.0.0b1+)
-        self.client = AIProjectClient(
-            endpoint=self.project_endpoint,
-            credential=self.credential
-        )
+        
+        # Store credential and client for agent creation
+        self._credential = None
+        self._ai_client = None
 
         logger.info(
             "SOCOrchestrator initialized",
@@ -63,53 +65,9 @@ class SOCOrchestrator:
             max_stalls=max_stall_count,
         )
 
-    def discover_agents(self) -> Dict[str, Any]:
+    async def create_workflow(self, agents: Optional[Dict[str, Any]] = None):
         """
-        Discover deployed agents in Microsoft Foundry.
-        
-        Uses client.agents.get(agent_name=...) from azure-ai-projects 2.0.
-
-        Returns:
-            Dictionary mapping agent role to agent object
-
-        Note:
-            Agent roles: manager, triage, hunting, response, intelligence
-        """
-        logger.info("Discovering agents")
-
-        agents = {}
-        agent_mapping = {
-            "manager": "SOC_Manager",
-            "triage": "AlertTriageAgent",
-            "hunting": "ThreatHuntingAgent",
-            "response": "IncidentResponseAgent",
-            "intelligence": "ThreatIntelligenceAgent",
-        }
-
-        for role, name in agent_mapping.items():
-            try:
-                # Use get() method with agent_name parameter (azure-ai-projects 2.0+)
-                agent = self.client.agents.get(agent_name=name)
-                agents[role] = agent
-                logger.info("Agent discovered", role=role, name=name, agent_id=agent.id, version=agent.version)
-            except Exception as e:
-                logger.warning(
-                    "Agent not found or error",
-                    role=role,
-                    name=name,
-                    error=str(e),
-                )
-
-        if not agents:
-            logger.error("No agents discovered")
-            raise ValueError("No agents found in Microsoft Foundry project")
-
-        logger.info("Agent discovery complete", agent_count=len(agents))
-        return agents
-
-    def create_workflow(self, agents: Optional[Dict[str, Any]] = None):
-        """
-        Create magentic workflow with discovered agents.
+        Create magentic workflow with agent-framework compatible agents.
 
         This is the PLUGIN POINT for orchestration strategy changes.
         To use a different orchestration approach:
@@ -118,7 +76,7 @@ class SOCOrchestrator:
         3. Update documentation with new strategy details
 
         Args:
-            agents: Dictionary mapping agent role to Agent instance.
+            agents: Dictionary mapping agent role to agent instances.
                    If None, discovers agents automatically.
 
         Returns:
@@ -136,30 +94,133 @@ class SOCOrchestrator:
             # 2. Define agent execution order
             # 3. Update max_round_count → max_steps
         """
-        if agents is None:
-            agents = self.discover_agents()
+        logger.info("Creating magentic workflow with mixed agents")
+        logger.info("Manager: Standard ChatAgent with Azure OpenAI")
+        logger.info("Participants: Foundry agents via AzureAIClient")
 
-        logger.info("Creating magentic workflow", agent_count=len(agents))
+        # Set environment variable for AzureAIClient
+        os.environ["AZURE_AI_PROJECT_ENDPOINT"] = self.project_endpoint
 
-        # Get manager agent (required for magentic)
-        if "manager" not in agents:
-            raise ValueError("Manager agent not found - required for magentic orchestration")
-
-        manager_agent = agents["manager"]
-
-        # Build participant dict (exclude manager from participants)
-        participants = {
-            role: agent
-            for role, agent in agents.items()
-            if role != "manager"
+        # Agent mapping for participants (not manager)
+        participant_mapping = {
+            "triage": "alert-triage-agent",
+            "hunting": "threat-hunting-agent",
+            "response": "incident-response-agent",
+            "intelligence": "threat-intelligence-agent",
         }
+
+        # Create credentials (sync for manager, async for Foundry agents)
+        sync_credential = SyncAzureCliCredential()
+        self._credential = AzureCliCredential()
+        
+        # Get model deployment name and endpoint from environment
+        model_id = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4-1-mini")
+        openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        
+        if not openai_endpoint:
+            raise ValueError(
+                "AZURE_OPENAI_ENDPOINT environment variable is required for manager agent. "
+                "Set it to your Azure OpenAI endpoint (e.g., https://xxx.openai.azure.com/)"
+            )
+        
+        # Azure OpenAI SDK expects base URL without /openai/v1/ suffix
+        # Strip it if present to avoid duplicate path segments
+        if openai_endpoint.endswith("/openai/v1/"):
+            openai_endpoint = openai_endpoint.replace("/openai/v1/", "/")
+        elif openai_endpoint.endswith("/openai/v1"):
+            openai_endpoint = openai_endpoint.replace("/openai/v1", "")
+        
+        logger.info("Using Azure OpenAI for manager", 
+                   endpoint=openai_endpoint, 
+                   deployment=model_id,
+                   api_version=api_version)
+        
+        # Create manager agent using standard ChatAgent (not Foundry agent)
+        # This avoids the 400 Bad Request issue with Azure AI Agent Responses API
+        logger.info("Creating standard ChatAgent for manager")
+        
+        # Load manager instructions from file
+        agent_definitions_path = Path(__file__).parent.parent / "deployment" / "agent_definitions"
+        manager_instructions_file = agent_definitions_path / "manager_instructions.md"
+        
+        if not manager_instructions_file.exists():
+            raise FileNotFoundError(f"Manager instructions not found: {manager_instructions_file}")
+        
+        with open(manager_instructions_file, "r", encoding="utf-8") as f:
+            manager_instructions = f.read()
+        
+        logger.info("Manager instructions loaded", size=len(manager_instructions))
+        
+        # Create Azure OpenAI chat client for manager (uses sync credential)
+        manager_chat_client = AzureOpenAIChatClient(
+            credential=sync_credential,
+            deployment_name=model_id,
+            endpoint=openai_endpoint,
+            api_version=api_version,
+        )
+        
+        # Create standard ChatAgent for manager
+        manager_agent = ChatAgent(
+            name="soc-manager",
+            instructions=manager_instructions,
+            chat_client=manager_chat_client,
+        )
+        
+        logger.info("Manager ChatAgent created", name="soc-manager")
+        
+        # Load participant agents from Foundry
+        # Create AIProjectClient to list agents
+        from azure.ai.projects.aio import AIProjectClient
+        project_client = AIProjectClient(
+            endpoint=self.project_endpoint,
+            credential=self._credential
+        )
+        
+        # List all agents to get their IDs (includes version)
+        logger.info("Listing participant agents from Microsoft Foundry")
+        agents_list = project_client.agents.list()
+        
+        # Build mapping of agent name to agent ID (name:version format)
+        agent_ids = {}
+        async for agent in agents_list:
+            agent_ids[agent.name] = agent.id
+            logger.debug("Found agent", name=agent.name, id=agent.id)
+        
+        logger.info("Discovered Foundry agents", count=len(agent_ids), agents=list(agent_ids.keys()))
+        
+        # Load participant agents from Foundry
+        logger.info("Loading participant agents from Microsoft Foundry")
+        participants = {}
+        for role, name in participant_mapping.items():
+            if name not in agent_ids:
+                logger.warning("Participant agent not found in Foundry", role=role, name=name)
+                continue
+                
+            try:
+                # Create AzureAIClient specifically for this participant agent
+                agent_client = AzureAIClient(
+                    credential=self._credential,
+                    model_deployment_name=model_id,
+                    project_client=project_client,
+                    agent_name=agent_ids[name],  # Set the agent name for this client
+                )
+                # Create the agent (no need to pass agent_name again)
+                agent = agent_client.create_agent(
+                    instructions="",  # Instructions already defined in Foundry
+                )
+                participants[role] = agent
+                logger.info("Participant agent loaded", role=role, name=name, id=agent_ids[name])
+            except Exception as e:
+                logger.warning(
+                    "Failed to load participant agent",
+                    role=role,
+                    name=name,
+                    error=str(e),
+                )
 
         if not participants:
             logger.warning("No participant agents found - workflow will have limited functionality")
-
-        # Get OpenAI client for chat completions
-        openai_client = self.client.get_openai_client()
-        chat_client = openai_client.chat.completions
 
         # =====================================================================
         # PLUGIN POINT: Magentic Orchestration (MVP Strategy)
@@ -171,9 +232,9 @@ class SOCOrchestrator:
         try:
             workflow = (
                 MagenticBuilder()
-                .participants(**participants)  # Specialized agents
+                .participants(**participants)  # Agents implement AgentProtocol
                 .with_standard_manager(
-                    chat_client=chat_client,
+                    agent=manager_agent,  # Use 'agent' parameter for manager
                     max_round_count=self.max_round_count,
                     max_stall_count=self.max_stall_count,
                     max_reset_count=self.max_reset_count,
@@ -184,7 +245,7 @@ class SOCOrchestrator:
             logger.info(
                 "Magentic workflow created",
                 participants=list(participants.keys()),
-                manager=manager_agent.name,
+                manager="manager",
             )
 
             return workflow
@@ -196,6 +257,18 @@ class SOCOrchestrator:
                 exc_info=True,
             )
             raise
+
+    async def cleanup(self):
+        """
+        Cleanup resources (credential, client).
+        
+        Should be called when done with orchestrator.
+        """
+        if self._credential:
+            await self._credential.close()
+            self._credential = None
+        self._ai_client = None
+        logger.info("Orchestrator resources cleaned up")
 
     def get_workflow_config(self) -> Dict:
         """
@@ -223,7 +296,7 @@ class SOCOrchestrator:
 # =============================================================================
 
 
-def create_soc_workflow(
+async def create_soc_workflow(
     max_round_count: int = 10,
     max_stall_count: int = 3,
     max_reset_count: int = 2,
@@ -240,17 +313,21 @@ def create_soc_workflow(
         Workflow instance ready for execution
 
     Example:
-        >>> workflow = create_soc_workflow()
-        >>> async for event in workflow.run("Analyze this alert: ..."):
-        ...     print(event)
+        >>> import asyncio
+        >>> async def main():
+        ...     workflow = await create_soc_workflow()
+        ...     async for event in workflow.run("Analyze this alert: ..."):
+        ...         print(event)
+        >>> asyncio.run(main())
     """
     orchestrator = SOCOrchestrator(
         max_round_count=max_round_count,
         max_stall_count=max_stall_count,
         max_reset_count=max_reset_count,
     )
-
-    return orchestrator.create_workflow()
+    
+    workflow = await orchestrator.create_workflow()
+    return workflow
 
 
 # =============================================================================
